@@ -134,8 +134,13 @@ ART STYLE:
 - Portrait orientation (5:7 ratio)
 - High detail, vivid colors, professional card game quality
 
-Character name: ${stats.name}
-Element type: ${stats.type}`;
+CRITICAL — NO TEXT:
+- Do NOT render any text, letters, words, numbers, or titles on the image
+- Do NOT include the character name, HP, stats, or any card text
+- The image should be ONLY the character artwork with no typography whatsoever
+- Text overlays will be added separately — the generated image must be text-free
+
+Element theme: ${stats.type}`;
 }
 
 /* Step 2b: Generate stylized character art from reference photo

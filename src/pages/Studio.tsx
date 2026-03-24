@@ -61,14 +61,14 @@ const CREATURE_SUGGESTIONS = {
 };
 
 const ART_STYLES = [
-  { id: 'anime', label: 'Anime', desc: 'vibrant anime/cartoon style with cel shading and dynamic energy lines' },
-  { id: 'watercolor', label: 'Watercolor', desc: 'soft watercolor painting with flowing colors and artistic brushstrokes' },
-  { id: 'comic', label: 'Comic Book', desc: 'bold comic book style with thick outlines, halftone dots, and dramatic lighting' },
-  { id: 'pixel', label: 'Pixel Art', desc: 'retro pixel art style with chunky pixels, limited palette, and nostalgic game feel' },
-  { id: 'chibi', label: 'Chibi', desc: 'adorable chibi/super-deformed style with oversized head, tiny body, and cute expressions' },
-  { id: 'oil', label: 'Oil Painting', desc: 'classical oil painting style with rich textures, dramatic lighting, and fine detail' },
-  { id: 'neon', label: 'Neon Glow', desc: 'neon-lit cyberpunk style with glowing edges, dark background, and vibrant light trails' },
-  { id: '3d', label: '3D Render', desc: 'polished 3D render style like a Pixar movie, with smooth shading and cinematic lighting' },
+  { id: 'anime', label: 'Anime', emoji: '\uD83C\uDFAC', preview: 'Cel-shaded, bold colors, speed lines', desc: 'vibrant anime/cartoon style with cel shading and dynamic energy lines' },
+  { id: 'watercolor', label: 'Watercolor', emoji: '\uD83C\uDFA8', preview: 'Soft washes, flowing colors', desc: 'soft watercolor painting with flowing colors and artistic brushstrokes' },
+  { id: 'comic', label: 'Comic Book', emoji: '\uD83D\uDCA5', preview: 'Thick outlines, halftone dots', desc: 'bold comic book style with thick outlines, halftone dots, and dramatic lighting' },
+  { id: 'pixel', label: 'Pixel Art', emoji: '\uD83D\uDC7E', preview: 'Retro chunky pixels, 8-bit feel', desc: 'retro pixel art style with chunky pixels, limited palette, and nostalgic game feel' },
+  { id: 'chibi', label: 'Chibi', emoji: '\uD83E\uDD7A', preview: 'Big head, tiny body, super cute', desc: 'adorable chibi/super-deformed style with oversized head, tiny body, and cute expressions' },
+  { id: 'oil', label: 'Oil Painting', emoji: '\uD83D\uDDBC\uFE0F', preview: 'Rich textures, dramatic light', desc: 'classical oil painting style with rich textures, dramatic lighting, and fine detail' },
+  { id: 'neon', label: 'Neon Glow', emoji: '\uD83C\uDF03', preview: 'Glowing edges, cyberpunk vibes', desc: 'neon-lit cyberpunk style with glowing edges, dark background, and vibrant light trails' },
+  { id: '3d', label: '3D Render', emoji: '\uD83C\uDFAE', preview: 'Pixar-style, smooth & cinematic', desc: 'polished 3D render style like a Pixar movie, with smooth shading and cinematic lighting' },
 ];
 
 type WizardStep = 'upload' | 'transform' | 'preview';
@@ -276,8 +276,8 @@ export default function Studio() {
   };
 
   const handleExport = async () => {
-    if (!cardPreviewRef.current) return;
-    await exportCardToPng(cardPreviewRef.current, cardData.name || 'card');
+    if (!cardImage) return;
+    await exportCardToPng(previewCard);
   };
 
   const previewCard: CardData = {
@@ -452,7 +452,7 @@ export default function Studio() {
                   </div>
                 </div>
 
-                {/* Art Style Picker */}
+                {/* Art Style Picker — with emoji previews and descriptions */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-black text-on-surface-variant uppercase tracking-widest">Art Style</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -460,38 +460,48 @@ export default function Studio() {
                       <button
                         key={s.id}
                         onClick={() => { setArtStyle(s.id); rebuildPrompt(undefined, s.id); }}
-                        className={`px-3 py-2.5 rounded-2xl text-xs font-bold transition-all border-2 text-center ${
+                        className={`p-3 rounded-2xl text-left transition-all border-2 ${
                           artStyle === s.id
-                            ? 'luminous-forge text-white border-primary shadow-lg shadow-primary/25 scale-105'
+                            ? 'luminous-forge text-white border-primary shadow-lg shadow-primary/25 scale-[1.03]'
                             : 'bg-surface-container-low text-on-surface border-transparent hover:border-primary/20 hover:bg-primary/5'
                         }`}
                       >
-                        {s.label}
+                        <span className="text-xl block mb-1">{s.emoji}</span>
+                        <span className="text-xs font-bold block">{s.label}</span>
+                        <span className={`text-[9px] block leading-tight mt-0.5 ${artStyle === s.id ? 'text-white/70' : 'text-on-surface-variant'}`}>{s.preview}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Card Type — tappable chips */}
+                {/* Card Type — visual chips with type colors and descriptions */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-black text-on-surface-variant uppercase tracking-widest">Card Type</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                     {CARD_TYPES.map(t => {
-                      const typeEmoji: Record<string, string> = {
-                        Fire: '\uD83D\uDD25', Water: '\uD83D\uDCA7', Grass: '\uD83C\uDF3F',
-                        Electric: '\u26A1', Psychic: '\uD83D\uDD2E', Normal: '\u2B50',
+                      const typeInfo: Record<string, { emoji: string; color: string; bg: string; desc: string }> = {
+                        Fire:     { emoji: '\uD83D\uDD25', color: 'text-red-500',    bg: 'bg-red-500',    desc: 'Burn & blaze' },
+                        Water:    { emoji: '\uD83D\uDCA7', color: 'text-blue-500',   bg: 'bg-blue-500',   desc: 'Flow & freeze' },
+                        Grass:    { emoji: '\uD83C\uDF3F', color: 'text-green-500',  bg: 'bg-green-500',  desc: 'Grow & heal' },
+                        Electric: { emoji: '\u26A1',        color: 'text-yellow-500', bg: 'bg-yellow-500', desc: 'Shock & speed' },
+                        Psychic:  { emoji: '\uD83D\uDD2E', color: 'text-purple-500', bg: 'bg-purple-500', desc: 'Mind & mystic' },
+                        Normal:   { emoji: '\u2B50',        color: 'text-gray-500',   bg: 'bg-gray-500',   desc: 'Balanced' },
                       };
+                      const info = typeInfo[t];
+                      const selected = cardData.type === t;
                       return (
                         <button
                           key={t}
                           onClick={() => { setCardData(d => ({ ...d, type: t })); rebuildPrompt(); }}
-                          className={`px-4 py-2 rounded-full text-xs font-bold transition-all border-2 ${
-                            cardData.type === t
-                              ? 'bg-primary text-white border-primary shadow-md shadow-primary/25 scale-105'
-                              : 'bg-surface-container-low text-on-surface border-transparent hover:border-primary/30 hover:bg-primary/5'
+                          className={`p-2 rounded-2xl text-center transition-all border-2 ${
+                            selected
+                              ? `${info.bg} text-white border-transparent shadow-md scale-[1.03]`
+                              : 'bg-surface-container-low text-on-surface border-transparent hover:border-primary/20 hover:bg-primary/5'
                           }`}
                         >
-                          <span className="mr-1">{typeEmoji[t]}</span> {t}
+                          <span className="text-lg block">{info.emoji}</span>
+                          <span className="text-[10px] font-bold block">{t}</span>
+                          <span className={`text-[8px] block ${selected ? 'text-white/70' : 'text-on-surface-variant'}`}>{info.desc}</span>
                         </button>
                       );
                     })}
@@ -607,27 +617,41 @@ export default function Studio() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Attack 1 — with description/effect field */}
                     <div className="bg-surface-container-low p-4 rounded-2xl space-y-2">
-                      <span className="text-xs font-black text-on-surface uppercase">Attack 1</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-primary uppercase tracking-wider">Attack 1</span>
+                        <div className="h-px flex-1 bg-primary/10" />
+                      </div>
                       <input type="text" value={cardData.attack1.name} onChange={e => setCardData({...cardData, attack1: {...cardData.attack1, name: e.target.value}})}
-                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name" />
+                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name (e.g. Thunderbolt)" />
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-outline shrink-0">DMG: {cardData.attack1.damage}</span>
                         <input type="range" min="10" max="200" step="10" value={cardData.attack1.damage}
                           onChange={e => setCardData({...cardData, attack1: {...cardData.attack1, damage: parseInt(e.target.value)}})}
                           className="flex-1 h-1.5 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary" />
                       </div>
+                      <input type="text" value={cardData.attack1.description} onChange={e => setCardData({...cardData, attack1: {...cardData.attack1, description: e.target.value}})}
+                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-xs text-on-surface-variant outline-none italic"
+                        placeholder="Power effect (e.g. Flip a coin. If heads, does 30 more damage.)" />
                     </div>
+                    {/* Attack 2 — with description/effect field */}
                     <div className="bg-surface-container-low p-4 rounded-2xl space-y-2">
-                      <span className="text-xs font-black text-on-surface uppercase">Attack 2 (opt.)</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-secondary uppercase tracking-wider">Attack 2 (opt.)</span>
+                        <div className="h-px flex-1 bg-secondary/10" />
+                      </div>
                       <input type="text" value={cardData.attack2.name} onChange={e => setCardData({...cardData, attack2: {...cardData.attack2, name: e.target.value}})}
-                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name" />
+                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name (e.g. Mega Punch)" />
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-outline shrink-0">DMG: {cardData.attack2.damage}</span>
                         <input type="range" min="10" max="200" step="10" value={cardData.attack2.damage}
                           onChange={e => setCardData({...cardData, attack2: {...cardData.attack2, damage: parseInt(e.target.value)}})}
                           className="flex-1 h-1.5 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary" />
                       </div>
+                      <input type="text" value={cardData.attack2.description} onChange={e => setCardData({...cardData, attack2: {...cardData.attack2, description: e.target.value}})}
+                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-xs text-on-surface-variant outline-none italic"
+                        placeholder="Power effect (e.g. Discard 2 Energy from this Pokemon.)" />
                     </div>
                   </div>
                 </div>

@@ -26,8 +26,7 @@ export default function Gallery() {
   };
 
   const handleExport = (card: CardData) => {
-    const el = document.getElementById(`card-${card.id}`);
-    if (el) exportCardToPng(el, card.name);
+    exportCardToPng(card);
   };
 
   return (
