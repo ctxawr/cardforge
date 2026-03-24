@@ -1,0 +1,78 @@
+/* CardForge — Luminous Forge design system v1.2 */
+/* ctxAWR: Removed duplicate Google Font @imports (fonts loaded via index.html <link>) to fix CSS @import order warning */
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Luminous Forge Color Tokens ── */
+  --color-primary: #7d12ff;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #eedeff;
+  --color-on-primary-container: #21005e;
+  --color-secondary: #7c4dff;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e9ddff;
+  --color-on-secondary-container: #22005d;
+  --color-tertiary: #7d3d00;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #ffddb3;
+  --color-on-tertiary-container: #2a1100;
+  --color-error: #ba1a1a;
+  --color-surface: #fbf8ff;
+  --color-surface-bright: #fbf8ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f4f2fe;
+  --color-surface-container: #eeecf8;
+  --color-surface-container-high: #e9e7f3;
+  --color-surface-container-highest: #e3e1ed;
+  --color-on-surface: #1a1b23;
+  --color-on-surface-variant: #4a4455;
+  --color-outline: #7b7487;
+  --color-outline-variant: #ccc3d8;
+  --color-inverse-surface: #2f3039;
+  --color-inverse-primary: #d2bbff;
+
+  /* ── Radius scale ── */
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+
+  /* ── Motion ── */
+  @keyframes pulse-forge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+  --animate-pulse-forge: pulse-forge 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ── Gradient utility: primary CTA / hero surfaces ── */
+@utility luminous-forge {
+  background: linear-gradient(135deg, #7d12ff 0%, #7c4dff 100%);
+}
+
+/* ── Glass surface with purple tint ── */
+@utility glass-forge {
+  background: rgba(125, 18, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Navbar glass ── */
+@utility glass-nav {
+  background: rgba(251, 248, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Card glow shadow ── */
+@utility shadow-glow {
+  box-shadow: 0 0 24px rgba(125, 18, 255, 0.25);
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-sans antialiased;
+  }
+}
