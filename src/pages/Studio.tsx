@@ -1,7 +1,9 @@
-/* Studio.tsx — Luminous Forge v1.4 — VMAX card creator with crop + AI transform */
-/* ctxAWR: New 3-step flow: Upload+Crop → AI Transform+Attributes → VMAX Preview+Save */
+/* Studio.tsx — Luminous Forge v1.5 — AI-powered card creator */
+/* ctxAWR: Proper flow: Upload+Crop (reference only) → Analyze+Generate art → Preview+Save
+   The photo is NEVER used on the card — AI generates a stylized character illustration. */
 import {
-  CloudUpload, ArrowLeft, Download, Sparkles, Wand2, Loader2, Image as ImageIcon
+  CloudUpload, ArrowLeft, Download, Sparkles, Wand2, Loader2,
+  Image as ImageIcon, Eye, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -13,33 +15,41 @@ import VmaxCard from '../components/Card';
 import { saveCard } from '../hooks/useCardStorage';
 import { exportCardToPng } from '../hooks/useCardExport';
 import {
+  analyzeReferenceImage,
+  generateCardArt,
   generateCardStats,
-  transformCardImage,
   isGeminiAvailable,
+  type GeneratedStats,
 } from '../hooks/useGeminiAI';
 import type { CardData } from '../types/card';
 
 const CARD_TYPES: CardData['type'][] = ['Fire', 'Water', 'Grass', 'Electric', 'Psychic', 'Normal'];
 const RARITIES: CardData['rarity'][] = ['common', 'uncommon', 'rare', 'ultra-rare'];
 
+type WizardStep = 'upload' | 'transform' | 'preview';
+
 export default function Studio() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<WizardStep>('upload');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cardPreviewRef = useRef<HTMLDivElement>(null);
 
-  // Image states: raw upload → cropped → AI-transformed
+  // Reference image states (never shown on card)
   const [rawImage, setRawImage] = useState('');
   const [showCropper, setShowCropper] = useState(false);
   const [croppedImage, setCroppedImage] = useState('');
-  const [transformedImage, setTransformedImage] = useState('');
 
-  // AI states
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
+  // AI-generated card art (this goes on the card)
+  const [generatedArt, setGeneratedArt] = useState('');
+
+  // AI state
+  const [analyzing, setAnalyzing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [creatureOverride, setCreatureOverride] = useState('');
 
+  // Card stats (auto-filled by AI analysis, editable by user)
   const [cardData, setCardData] = useState({
     name: '',
     hp: 100,
@@ -49,12 +59,13 @@ export default function Studio() {
     attack1: { name: '', damage: 30, description: '' },
     attack2: { name: '', damage: 60, description: '' },
   });
+  const [analysisResult, setAnalysisResult] = useState<GeneratedStats | null>(null);
 
-  const nextStep = () => setStep(s => Math.min(s + 1, 3));
-  const prevStep = () => setStep(s => Math.max(s - 1, 1));
+  const stepIndex = step === 'upload' ? 1 : step === 'transform' ? 2 : 3;
+  const referenceImage = croppedImage || rawImage;
 
-  // The final card image — prefer AI transformed, fall back to cropped, then raw
-  const finalImage = transformedImage || croppedImage || rawImage;
+  // The card uses ONLY generated art, never the photo
+  const cardImage = generatedArt;
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return;
@@ -64,7 +75,8 @@ export default function Studio() {
         setRawImage(e.target.result);
         setShowCropper(true);
         setCroppedImage('');
-        setTransformedImage('');
+        setGeneratedArt('');
+        setAnalysisResult(null);
       }
     };
     reader.readAsDataURL(file);
@@ -87,61 +99,69 @@ export default function Studio() {
 
   const handleCropCancel = () => {
     setShowCropper(false);
-    if (!croppedImage) {
-      setRawImage('');
-    }
+    if (!croppedImage) setRawImage('');
   };
 
-  // AI Transform: converts cropped photo → stylized art + auto-fills stats
-  const handleAITransform = async () => {
-    const sourceImage = croppedImage || rawImage;
-    if (!sourceImage || aiLoading) return;
-    setAiLoading(true);
+  // Step 1→2: Analyze the reference photo, auto-fill stats
+  const handleAnalyze = async () => {
+    if (!referenceImage || analyzing) return;
+    setAnalyzing(true);
     setAiError('');
     try {
-      const result = await transformCardImage(sourceImage, aiPrompt || undefined);
-      setTransformedImage(result.imageDataUrl);
+      const stats = await analyzeReferenceImage(referenceImage);
+      setAnalysisResult(stats);
       setCardData({
-        name: result.stats.name,
-        hp: result.stats.hp,
-        type: result.stats.type,
-        rarity: result.stats.rarity,
-        description: result.stats.description,
-        attack1: result.stats.attack1,
-        attack2: result.stats.attack2,
+        name: stats.name,
+        hp: stats.hp,
+        type: stats.type,
+        rarity: stats.rarity,
+        description: stats.description,
+        attack1: stats.attack1,
+        attack2: stats.attack2,
       });
+      setCreatureOverride(stats.suggestedCreature);
+      setStep('transform');
     } catch (err) {
-      console.error('AI transform failed:', err);
-      setAiError(err instanceof Error ? err.message : 'Transform failed. Try a different photo.');
+      console.error('Analysis failed:', err);
+      setAiError(err instanceof Error ? err.message : 'Analysis failed. Try a different photo.');
     } finally {
-      setAiLoading(false);
+      setAnalyzing(false);
     }
   };
 
-  // Text-only AI stat generation (fallback if no image transform)
-  const handleAIStats = async () => {
-    if (!aiPrompt.trim() || aiLoading) return;
-    setAiLoading(true);
+  // Generate stylized character art from reference
+  const handleGenerateArt = async () => {
+    if (!referenceImage || generating) return;
+    setGenerating(true);
+    setAiError('');
     try {
-      const generated = await generateCardStats(aiPrompt);
-      setCardData({
-        name: generated.name,
-        hp: generated.hp,
-        type: generated.type,
-        rarity: generated.rarity,
-        description: generated.description,
-        attack1: generated.attack1,
-        attack2: generated.attack2,
-      });
+      const stats = analysisResult ?? {
+        ...cardData,
+        subjectDescription: '',
+        suggestedCreature: creatureOverride || 'mystical creature',
+      };
+      const artDataUrl = await generateCardArt(referenceImage, stats, creatureOverride || undefined);
+      setGeneratedArt(artDataUrl);
     } catch (err) {
-      console.error('AI generation failed:', err);
+      console.error('Art generation failed:', err);
+      setAiError(err instanceof Error ? err.message : 'Art generation failed. Try again or use a different photo.');
     } finally {
-      setAiLoading(false);
+      setGenerating(false);
+    }
+  };
+
+  // Auto-analyze + generate when moving to step 2
+  const goToTransform = async () => {
+    if (!referenceImage) return;
+    if (!analysisResult) {
+      await handleAnalyze();
+    } else {
+      setStep('transform');
     }
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || !cardImage) return;
     setSaving(true);
     try {
       const card: CardData = {
@@ -151,7 +171,7 @@ export default function Studio() {
         type: cardData.type,
         rarity: cardData.rarity,
         frameId: 'vmax',
-        imageDataUrl: finalImage,
+        imageDataUrl: cardImage,
         description: cardData.description,
         attack1: cardData.attack1,
         attack2: cardData.attack2.name ? cardData.attack2 : undefined,
@@ -171,15 +191,14 @@ export default function Studio() {
     await exportCardToPng(cardPreviewRef.current, cardData.name || 'card');
   };
 
-  // Build a CardData object for live preview
   const previewCard: CardData = {
     id: 'preview',
-    name: cardData.name,
+    name: cardData.name || 'Card Name',
     hp: cardData.hp,
     type: cardData.type,
     rarity: cardData.rarity,
     frameId: 'vmax',
-    imageDataUrl: finalImage,
+    imageDataUrl: cardImage,
     description: cardData.description,
     attack1: cardData.attack1,
     attack2: cardData.attack2.name ? cardData.attack2 : undefined,
@@ -195,33 +214,32 @@ export default function Studio() {
           <header className="space-y-2">
             <div className="flex items-center gap-2 mb-4">
               <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                Step 0{step}
+                Step 0{stepIndex}
               </span>
               <div className="h-px flex-1 bg-surface-container-high" />
-              {/* Step indicators */}
               <div className="flex gap-1.5">
                 {[1, 2, 3].map(s => (
-                  <div key={s} className={`w-2 h-2 rounded-full transition-all ${s === step ? 'bg-primary w-6' : s < step ? 'bg-primary/50' : 'bg-surface-container-high'}`} />
+                  <div key={s} className={`w-2 h-2 rounded-full transition-all ${s === stepIndex ? 'bg-primary w-6' : s < stepIndex ? 'bg-primary/50' : 'bg-surface-container-high'}`} />
                 ))}
               </div>
             </div>
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-on-surface leading-tight">
-              {step === 1 && <>Upload & <span className="text-primary">Crop</span></>}
-              {step === 2 && <>Transform & <span className="text-secondary">Infuse</span></>}
-              {step === 3 && <>Preview & <span className="text-tertiary">Save</span></>}
+              {step === 'upload' && <>Upload <span className="text-primary">Reference</span></>}
+              {step === 'transform' && <>Transform & <span className="text-secondary">Infuse</span></>}
+              {step === 'preview' && <>Preview & <span className="text-tertiary">Save</span></>}
             </h1>
             <p className="text-on-surface-variant text-lg max-w-xl">
-              {step === 1 && "Upload a photo and crop to select the subject for your card."}
-              {step === 2 && "AI transforms your photo into stylized card art and auto-fills attributes."}
-              {step === 3 && "Review your VMAX card and save it to your collection."}
+              {step === 'upload' && "Upload a photo as a reference. AI will create a stylized character based on it."}
+              {step === 'transform' && "AI analyzed your photo and suggested stats. Generate your character art below!"}
+              {step === 'preview' && "Your card is ready! Review and save it to your collection."}
             </p>
           </header>
 
           <AnimatePresence mode="wait">
 
             {/* Step 1: Upload + Crop */}
-            {step === 1 && (
-              <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+            {step === 'upload' && (
+              <motion.div key="upload" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
 
                 {showCropper && rawImage ? (
                   <ImageCropper
@@ -243,8 +261,8 @@ export default function Studio() {
                       >
                         {croppedImage ? (
                           <div className="space-y-3">
-                            <img src={croppedImage} alt="Cropped" className="max-h-48 rounded-xl object-contain mx-auto" />
-                            <p className="text-sm font-bold text-primary">Cropped & ready!</p>
+                            <img src={croppedImage} alt="Reference" className="max-h-48 rounded-xl object-contain mx-auto" />
+                            <p className="text-sm font-bold text-primary">Reference photo ready!</p>
                           </div>
                         ) : (
                           <div className="w-16 h-16 luminous-forge rounded-full flex items-center justify-center text-white shadow-xl shadow-primary/30">
@@ -253,9 +271,11 @@ export default function Studio() {
                         )}
                         <div className="space-y-1">
                           <h3 className="text-lg font-bold text-on-surface">
-                            {croppedImage ? 'Click or drop to upload a new photo' : 'Drag and drop a photo'}
+                            {croppedImage ? 'Upload a different photo' : 'Upload a reference photo'}
                           </h3>
-                          <p className="text-on-surface-variant text-sm font-medium">Upload a photo of yourself, a pet, or anything fun!</p>
+                          <p className="text-on-surface-variant text-sm font-medium">
+                            A photo of yourself, a pet, toy, or anything fun! AI will create card art from it.
+                          </p>
                         </div>
                         <button className="luminous-forge text-white font-bold px-7 py-2.5 rounded-full hover:scale-105 transition-transform shadow-lg shadow-primary/25 text-sm">
                           Browse Photos
@@ -281,141 +301,136 @@ export default function Studio() {
                         <ImageIcon className="w-4 h-4" /> Re-crop Photo
                       </button>
                     )}
+
+                    {aiError && (
+                      <p className="text-error text-sm font-medium text-center">{aiError}</p>
+                    )}
                   </>
                 )}
               </motion.div>
             )}
 
-            {/* Step 2: AI Transform + Attributes */}
-            {step === 2 && (
-              <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
+            {/* Step 2: Transform — AI stats + art generation */}
+            {step === 'transform' && (
+              <motion.div key="transform" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
 
-                {/* AI Image Transform */}
-                {isGeminiAvailable() && (croppedImage || rawImage) && (
+                {/* AI analysis summary */}
+                {analysisResult && (
+                  <div className="bg-primary-container/20 rounded-2xl p-5 border border-primary/10 space-y-2">
+                    <h3 className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                      <Eye className="w-3.5 h-3.5" /> AI Analysis
+                    </h3>
+                    <p className="text-sm text-on-surface-variant">{analysisResult.subjectDescription}</p>
+                    <p className="text-sm font-bold text-on-surface">
+                      Suggested fusion: <span className="text-primary">{analysisResult.suggestedCreature}</span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Art generation */}
+                {isGeminiAvailable() && (
                   <div className="bg-primary-container/30 rounded-3xl p-6 border border-primary/10 space-y-4">
                     <h3 className="text-sm font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                      <Wand2 className="w-4 h-4" /> AI Art Transformation
+                      <Wand2 className="w-4 h-4" /> Generate Character Art
                     </h3>
                     <p className="text-sm text-on-surface-variant">
-                      Transform your photo into stylized card art! Optionally describe what creature to merge with.
+                      AI will create a stylized character illustration based on your reference photo.
+                      {!generatedArt && ' Change the creature type below if you want!'}
                     </p>
                     <div className="flex gap-3">
                       <input
                         type="text"
-                        value={aiPrompt}
-                        onChange={e => setAiPrompt(e.target.value)}
-                        placeholder="e.g. 'a fire dragon' or 'an ice wolf' (optional)"
+                        value={creatureOverride}
+                        onChange={e => setCreatureOverride(e.target.value)}
+                        placeholder="e.g. 'fire dragon', 'ice wolf', 'thunder hawk'"
                         className="flex-1 bg-surface-container-lowest border-2 border-transparent focus:border-primary/30 rounded-2xl py-3 px-4 font-medium text-on-surface outline-none transition-all text-sm"
-                        onKeyDown={e => e.key === 'Enter' && handleAITransform()}
+                        onKeyDown={e => e.key === 'Enter' && handleGenerateArt()}
                       />
                       <button
-                        onClick={handleAITransform}
-                        disabled={aiLoading}
+                        onClick={handleGenerateArt}
+                        disabled={generating}
                         className="luminous-forge text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-primary/25 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
                       >
-                        {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                        {aiLoading ? 'Transforming...' : 'Transform'}
+                        {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        {generating ? 'Creating...' : generatedArt ? 'Regenerate' : 'Generate Art'}
                       </button>
                     </div>
+                    {generatedArt && (
+                      <div className="flex items-center gap-2 text-sm text-primary font-bold">
+                        <Zap className="w-4 h-4" /> Character art generated! See preview on the right.
+                      </div>
+                    )}
                     {aiError && (
                       <p className="text-error text-sm font-medium">{aiError}</p>
                     )}
-                    {transformedImage && (
-                      <div className="flex items-center gap-2 text-sm text-primary font-bold">
-                        <Sparkles className="w-4 h-4" /> Art transformed! Attributes auto-filled below.
+                  </div>
+                )}
+
+                {/* Editable attribute fields (pre-filled by AI) */}
+                <div className="space-y-6">
+                  <h3 className="text-xs font-black text-on-surface-variant uppercase tracking-widest">Card Attributes</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Card Name</label>
+                      <input type="text" value={cardData.name} onChange={e => setCardData({...cardData, name: e.target.value})}
+                        className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all"
+                        placeholder="Enter name..." />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Type</label>
+                      <select value={cardData.type} onChange={e => setCardData({...cardData, type: e.target.value as CardData['type']})}
+                        className="w-full bg-surface-container-low border-2 border-transparent focus:border-secondary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all appearance-none">
+                        {CARD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Rarity</label>
+                      <select value={cardData.rarity} onChange={e => setCardData({...cardData, rarity: e.target.value as CardData['rarity']})}
+                        className="w-full bg-surface-container-low border-2 border-transparent focus:border-secondary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all appearance-none capitalize">
+                        {RARITIES.map(r => <option key={r} value={r} className="capitalize">{r}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">HP: {cardData.hp}</label>
+                      <input type="range" min="30" max="300" step="10" value={cardData.hp}
+                        onChange={e => setCardData({...cardData, hp: parseInt(e.target.value)})}
+                        className="w-full h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary mt-2" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Description</label>
+                    <textarea value={cardData.description} onChange={e => setCardData({...cardData, description: e.target.value})}
+                      className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all resize-none h-20"
+                      placeholder="Flavor text for your card..." />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-surface-container-low p-5 rounded-2xl space-y-3">
+                      <span className="text-xs font-black text-on-surface uppercase">Attack 1</span>
+                      <input type="text" value={cardData.attack1.name} onChange={e => setCardData({...cardData, attack1: {...cardData.attack1, name: e.target.value}})}
+                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-outline shrink-0">DMG: {cardData.attack1.damage}</span>
+                        <input type="range" min="10" max="200" step="10" value={cardData.attack1.damage}
+                          onChange={e => setCardData({...cardData, attack1: {...cardData.attack1, damage: parseInt(e.target.value)}})}
+                          className="flex-1 h-1.5 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary" />
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Stats-only AI generation (when no image uploaded or as alternative) */}
-                {isGeminiAvailable() && !croppedImage && !rawImage && (
-                  <div className="bg-primary-container/30 rounded-3xl p-6 border border-primary/10 space-y-4">
-                    <h3 className="text-sm font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                      <Wand2 className="w-4 h-4" /> AI Card Generator
-                    </h3>
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        value={aiPrompt}
-                        onChange={e => setAiPrompt(e.target.value)}
-                        placeholder="Describe your creature..."
-                        className="flex-1 bg-surface-container-lowest border-2 border-transparent focus:border-primary/30 rounded-2xl py-3 px-4 font-medium text-on-surface outline-none transition-all text-sm"
-                        onKeyDown={e => e.key === 'Enter' && handleAIStats()}
-                      />
-                      <button
-                        onClick={handleAIStats}
-                        disabled={aiLoading || !aiPrompt.trim()}
-                        className="luminous-forge text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-primary/25 hover:scale-105 transition-transform disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                        Generate
-                      </button>
                     </div>
-                  </div>
-                )}
-
-                {/* Manual attribute fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Card Name</label>
-                    <input type="text" value={cardData.name} onChange={e => setCardData({...cardData, name: e.target.value})}
-                      className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all"
-                      placeholder="Enter name..." />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Type</label>
-                    <select value={cardData.type} onChange={e => setCardData({...cardData, type: e.target.value as CardData['type']})}
-                      className="w-full bg-surface-container-low border-2 border-transparent focus:border-secondary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all appearance-none">
-                      {CARD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Rarity</label>
-                    <select value={cardData.rarity} onChange={e => setCardData({...cardData, rarity: e.target.value as CardData['rarity']})}
-                      className="w-full bg-surface-container-low border-2 border-transparent focus:border-secondary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all appearance-none capitalize">
-                      {RARITIES.map(r => <option key={r} value={r} className="capitalize">{r}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">HP: {cardData.hp}</label>
-                    <input type="range" min="30" max="300" step="10" value={cardData.hp}
-                      onChange={e => setCardData({...cardData, hp: parseInt(e.target.value)})}
-                      className="w-full h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary mt-2" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-on-surface-variant uppercase tracking-widest">Description</label>
-                  <textarea value={cardData.description} onChange={e => setCardData({...cardData, description: e.target.value})}
-                    className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-3 px-4 font-bold text-on-surface outline-none transition-all resize-none h-20"
-                    placeholder="Flavor text for your card..." />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-surface-container-low p-5 rounded-2xl space-y-3">
-                    <span className="text-xs font-black text-on-surface uppercase">Attack 1</span>
-                    <input type="text" value={cardData.attack1.name} onChange={e => setCardData({...cardData, attack1: {...cardData.attack1, name: e.target.value}})}
-                      className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-outline shrink-0">DMG: {cardData.attack1.damage}</span>
-                      <input type="range" min="10" max="200" step="10" value={cardData.attack1.damage}
-                        onChange={e => setCardData({...cardData, attack1: {...cardData.attack1, damage: parseInt(e.target.value)}})}
-                        className="flex-1 h-1.5 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary" />
-                    </div>
-                  </div>
-                  <div className="bg-surface-container-low p-5 rounded-2xl space-y-3">
-                    <span className="text-xs font-black text-on-surface uppercase">Attack 2 (opt.)</span>
-                    <input type="text" value={cardData.attack2.name} onChange={e => setCardData({...cardData, attack2: {...cardData.attack2, name: e.target.value}})}
-                      className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-outline shrink-0">DMG: {cardData.attack2.damage}</span>
-                      <input type="range" min="10" max="200" step="10" value={cardData.attack2.damage}
-                        onChange={e => setCardData({...cardData, attack2: {...cardData.attack2, damage: parseInt(e.target.value)}})}
-                        className="flex-1 h-1.5 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary" />
+                    <div className="bg-surface-container-low p-5 rounded-2xl space-y-3">
+                      <span className="text-xs font-black text-on-surface uppercase">Attack 2 (opt.)</span>
+                      <input type="text" value={cardData.attack2.name} onChange={e => setCardData({...cardData, attack2: {...cardData.attack2, name: e.target.value}})}
+                        className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm font-bold text-on-surface outline-none" placeholder="Attack name" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-outline shrink-0">DMG: {cardData.attack2.damage}</span>
+                        <input type="range" min="10" max="200" step="10" value={cardData.attack2.damage}
+                          onChange={e => setCardData({...cardData, attack2: {...cardData.attack2, damage: parseInt(e.target.value)}})}
+                          className="flex-1 h-1.5 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -423,8 +438,16 @@ export default function Studio() {
             )}
 
             {/* Step 3: Preview + Save */}
-            {step === 3 && (
-              <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+            {step === 'preview' && (
+              <motion.div key="preview" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+
+                {!cardImage && (
+                  <div className="bg-error/10 rounded-2xl p-5 border border-error/20 text-center">
+                    <p className="text-error font-bold">No character art generated yet!</p>
+                    <p className="text-sm text-on-surface-variant mt-1">Go back and generate art before saving.</p>
+                  </div>
+                )}
+
                 <div className="bg-surface-container-low rounded-3xl p-6 space-y-4">
                   <h3 className="text-sm font-black text-on-surface-variant uppercase tracking-widest">Card Summary</h3>
                   <div className="grid grid-cols-2 gap-3">
@@ -444,10 +467,10 @@ export default function Studio() {
                 <div className="flex gap-4">
                   <button
                     onClick={handleExport}
-                    className="flex-1 bg-surface-container-high text-on-surface py-4 rounded-full font-bold flex items-center justify-center gap-2 hover:bg-surface-container-highest transition-all"
+                    disabled={!cardImage}
+                    className="flex-1 bg-surface-container-high text-on-surface py-4 rounded-full font-bold flex items-center justify-center gap-2 hover:bg-surface-container-highest transition-all disabled:opacity-50"
                   >
-                    <Download className="w-5 h-5" />
-                    Export PNG
+                    <Download className="w-5 h-5" /> Export PNG
                   </button>
                 </div>
               </motion.div>
@@ -456,19 +479,31 @@ export default function Studio() {
 
           {/* Nav buttons */}
           <div className="flex items-center justify-between pt-8 border-t border-surface-container-high">
-            <button onClick={step === 1 ? () => navigate(-1) : prevStep}
+            <button onClick={() => {
+              if (step === 'upload') navigate(-1);
+              else if (step === 'transform') setStep('upload');
+              else setStep('transform');
+            }}
               className="flex items-center gap-2 text-on-surface-variant font-bold hover:text-on-surface transition-colors">
               <ArrowLeft className="w-5 h-5"/>
-              {step === 1 ? 'Back' : 'Previous Step'}
+              {step === 'upload' ? 'Back' : 'Previous Step'}
             </button>
             <button
-              onClick={step === 3 ? handleSave : nextStep}
-              disabled={saving || (step === 1 && !rawImage && !croppedImage)}
-              className="luminous-forge text-white px-10 py-4 rounded-full font-extrabold tracking-wide uppercase text-sm shadow-xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+              onClick={() => {
+                if (step === 'upload') goToTransform();
+                else if (step === 'transform') setStep('preview');
+                else handleSave();
+              }}
+              disabled={
+                saving ||
+                (step === 'upload' && (!referenceImage || analyzing)) ||
+                (step === 'preview' && !cardImage)
+              }
+              className="luminous-forge text-white px-10 py-4 rounded-full font-extrabold tracking-wide uppercase text-sm shadow-xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              {step === 1 && 'Next: Transform'}
-              {step === 2 && 'Next: Preview'}
-              {step === 3 && (saving ? 'Saving...' : 'Save to Collection')}
+              {step === 'upload' && (analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</> : 'Next: Transform')}
+              {step === 'transform' && 'Next: Preview'}
+              {step === 'preview' && (saving ? 'Saving...' : 'Save to Collection')}
             </button>
           </div>
         </section>
@@ -486,9 +521,29 @@ export default function Studio() {
           <div ref={cardPreviewRef} className="relative">
             <div className="absolute -inset-4 luminous-forge opacity-5 rounded-3xl blur-3xl" />
             <VmaxCard card={previewCard} />
+            {!cardImage && (
+              <div className="absolute inset-0 flex items-center justify-center z-30">
+                <div className="bg-black/60 backdrop-blur-md rounded-2xl p-4 text-center">
+                  <Wand2 className="w-8 h-8 text-white mx-auto mb-2" />
+                  <p className="text-white text-sm font-bold">Art will appear here</p>
+                  <p className="text-white/60 text-xs">after AI generation</p>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Type + stats strip */}
+          {/* Reference thumbnail (small, labeled clearly) */}
+          {referenceImage && (
+            <div className="bg-surface-container-low rounded-2xl p-3 flex items-center gap-3">
+              <img src={referenceImage} alt="Reference" className="w-12 h-12 rounded-lg object-cover border border-outline-variant/20" />
+              <div>
+                <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Reference Photo</p>
+                <p className="text-xs text-on-surface-variant">Used as inspiration only — not on the card</p>
+              </div>
+            </div>
+          )}
+
+          {/* Stats strip */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-surface-container-low rounded-xl p-3 text-center">
               <span className="block text-[9px] font-black text-on-surface-variant uppercase tracking-tighter">Type</span>
