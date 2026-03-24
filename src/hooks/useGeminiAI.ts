@@ -104,18 +104,21 @@ Respond with ONLY valid JSON (no markdown fences):
 }
 
 /* Step 2a: Build the image generation prompt (exposed so UI can show/edit it)
-   v1.6 — ctxAWR: Prompt emphasizes preserving the subject's likeness/identity */
+   v1.6 — ctxAWR: Prompt emphasizes preserving the subject's likeness/identity.
+   Accepts optional style description for art style variation. */
 export function buildArtPrompt(
   stats: GeneratedStats,
   creatureOverride?: string,
+  styleDesc?: string,
 ): string {
   const creature = creatureOverride?.trim() || stats.suggestedCreature;
-  return `Transform this reference photo into a stylized anime/cartoon trading card illustration for a kids' card game.
+  const style = styleDesc?.trim() || 'vibrant anime/cartoon style with cel shading and dynamic energy lines';
+  return `Transform this reference photo into a stylized trading card illustration for a kids' card game.
 
 CRITICAL — LIKENESS PRESERVATION:
 - The generated character MUST be clearly recognizable as the person/subject in the reference photo
 - Preserve their face shape, hair color/style, skin tone, and distinguishing features
-- Think of it as drawing a cartoon/anime portrait of THIS specific person, not a generic character
+- Think of it as drawing a portrait of THIS specific person, not a generic character
 - If the subject is a person, their face should be the focal point and clearly identifiable
 
 CHARACTER FUSION:
@@ -123,8 +126,8 @@ CHARACTER FUSION:
 - The person's identity comes first, creature elements are layered on top (outfit, wings, tail, energy, etc.)
 - Do NOT replace the person's face or body — enhance them with ${creature} features
 
-STYLE & COMPOSITION:
-- Style: vibrant anime/cartoon, colorful, dynamic pose, energy effects
+ART STYLE:
+- Style: ${style}
 - Background: dramatic with magical/elemental energy matching "${stats.type}" type
 - Full body character, centered, facing forward or in action pose
 - Kid-friendly, fun, epic — like a Pokemon VMAX card illustration
