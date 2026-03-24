@@ -1,5 +1,5 @@
-/* Print.tsx — Luminous Forge v1.3 */
-/* ctxAWR: Data-driven print page — loads cards from IndexedDB, removed all placeholder data */
+/* Print.tsx — Luminous Forge v1.4 — VMAX cards */
+/* ctxAWR: Updated card rendering to use VmaxCard component */
 import { useState, useEffect } from 'react';
 import {
   Printer,
@@ -15,7 +15,7 @@ import {
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { loadCards } from '../hooks/useCardStorage';
-import { getFrame } from '../data/frames';
+import VmaxCard from '../components/Card';
 import type { CardData } from '../types/card';
 
 const MAX_SHEET = 8;
@@ -83,38 +83,17 @@ export default function Print() {
             <section className="mb-12">
               <h2 className="text-2xl font-bold text-on-surface mb-6">Print Sheet Preview</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {selectedCards.map((card) => {
-                  const frame = getFrame(card.frameId);
-                  return (
-                    <motion.div
-                      key={card.id}
-                      whileHover={{ scale: 1.02 }}
-                      className="relative group overflow-hidden rounded-2xl bg-surface-container-lowest shadow-lg transition-all"
+                {selectedCards.map((card) => (
+                  <div key={card.id} className="relative group">
+                    <VmaxCard card={card} compact />
+                    <button
+                      onClick={() => toggleCard(card.id)}
+                      className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-error transition-colors z-30"
                     >
-                      <div className="relative" style={{ aspectRatio: '500/670' }}>
-                        {card.imageDataUrl ? (
-                          <img src={card.imageDataUrl} alt={card.name} className="absolute inset-0 w-full h-full object-cover" />
-                        ) : (
-                          <div className="absolute inset-0 bg-surface-container-high" />
-                        )}
-                        <img src={frame?.src ?? '/frames/frame_classic_01.png'} alt="" className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none" />
-                        <div className="absolute top-3 right-3 z-20 bg-primary-container text-on-primary-container px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest">
-                          {card.rarity}
-                        </div>
-                      </div>
-                      <div className="px-4 pb-4 pt-2">
-                        <h4 className="font-bold text-sm truncate">{card.name}</h4>
-                        <p className="text-on-surface-variant text-xs">{card.type} — {card.hp} HP</p>
-                      </div>
-                      <button
-                        onClick={() => toggleCard(card.id)}
-                        className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-error transition-colors z-20"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </motion.div>
-                  );
-                })}
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
                 {slotsRemaining > 0 && (
                   <div className="rounded-2xl border-4 border-dashed border-outline-variant/30 flex flex-col items-center justify-center p-6 text-center">
                     <Plus className="w-6 h-6 text-primary mb-2" />
@@ -133,7 +112,6 @@ export default function Print() {
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {allCards.map((card) => {
                 const isSelected = selectedIds.has(card.id);
-                const frame = getFrame(card.frameId);
                 return (
                   <button
                     key={card.id}
@@ -145,26 +123,16 @@ export default function Print() {
                         : slotsRemaining === 0 ? 'opacity-40' : 'hover:shadow-lg'
                     }`}
                   >
-                    <div className="relative" style={{ aspectRatio: '500/670' }}>
-                      {card.imageDataUrl ? (
-                        <img src={card.imageDataUrl} alt={card.name} className="absolute inset-0 w-full h-full object-cover" />
-                      ) : (
-                        <div className="absolute inset-0 bg-surface-container-high" />
-                      )}
-                      <img src={frame?.src ?? '/frames/frame_classic_01.png'} alt="" className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none" />
-                      {isSelected && (
-                        <div className="absolute inset-0 z-20 bg-primary/20 flex items-center justify-center">
-                          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-                            </svg>
-                          </div>
+                    <VmaxCard card={card} compact showOverlays={false} />
+                    {isSelected && (
+                      <div className="absolute inset-0 z-30 bg-primary/20 rounded-2xl flex items-center justify-center">
+                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                          </svg>
                         </div>
-                      )}
-                    </div>
-                    <div className="p-2 bg-surface-container-lowest">
-                      <h3 className="text-xs font-bold text-on-surface truncate">{card.name}</h3>
-                    </div>
+                      </div>
+                    )}
                   </button>
                 );
               })}

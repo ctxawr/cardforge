@@ -71,6 +71,30 @@
   box-shadow: 0 0 24px rgba(125, 18, 255, 0.25);
 }
 
+/* ── VMAX full-bleed card holographic border ── */
+@utility vmax-border {
+  position: relative;
+}
+
+@utility vmax-holo {
+  background: conic-gradient(
+    from 0deg,
+    #7d12ff 0deg,
+    #ff6bef 60deg,
+    #7c4dff 120deg,
+    #00d4ff 180deg,
+    #7d12ff 240deg,
+    #ff6bef 300deg,
+    #7d12ff 360deg
+  );
+  animation: holo-rotate 4s linear infinite;
+}
+
+@keyframes holo-rotate {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+
 @layer base {
   body {
     @apply bg-surface text-on-surface font-sans antialiased;

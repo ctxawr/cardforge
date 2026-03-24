@@ -1,5 +1,5 @@
-/* Home.tsx — Luminous Forge v1.3 */
-/* ctxAWR: Data-driven home — auth user name, recent cards from IndexedDB, no placeholder data */
+/* Home.tsx — Luminous Forge v1.4 — VMAX cards */
+/* ctxAWR: Updated recent cards to use VmaxCard component */
 import { useState, useEffect } from 'react';
 import {
   Sparkles,
@@ -13,7 +13,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { loadCards } from '../hooks/useCardStorage';
-import { getFrame } from '../data/frames';
+import VmaxCard from '../components/Card';
 import type { CardData } from '../types/card';
 
 export default function Home() {
@@ -160,30 +160,11 @@ export default function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-            {recentCards.map((card) => {
-              const frame = getFrame(card.frameId);
-              return (
-                <div key={card.id} className="group relative rounded-2xl overflow-hidden shadow-md hover:shadow-xl hover:shadow-primary/15 transition-all bg-surface-container-lowest">
-                  <div className="relative" style={{ aspectRatio: '500/670' }}>
-                    {card.imageDataUrl ? (
-                      <img src={card.imageDataUrl} alt={card.name} className="absolute inset-0 w-full h-full object-cover" />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-surface-container-high to-surface-container" />
-                    )}
-                    <img
-                      src={frame?.src ?? '/frames/frame_classic_01.png'} alt="" aria-hidden="true"
-                      className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
-                    />
-                    <div className="absolute top-2 right-2 z-20 bg-black/60 backdrop-blur-md text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                      {card.rarity}
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <h3 className="text-sm font-extrabold tracking-tight text-on-surface truncate">{card.name}</h3>
-                  </div>
-                </div>
-              );
-            })}
+            {recentCards.map((card) => (
+              <div key={card.id}>
+                <VmaxCard card={card} compact />
+              </div>
+            ))}
           </div>
         </section>
       )}

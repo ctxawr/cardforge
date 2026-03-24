@@ -1,11 +1,11 @@
-/* Decks.tsx — Luminous Forge v1.3 */
-/* ctxAWR: Data-driven decks from IndexedDB, removed all hardcoded placeholder data */
+/* Decks.tsx — Luminous Forge v1.4 — VMAX cards */
+/* ctxAWR: Updated card rendering to use VmaxCard component */
 import { Layers, PlusCircle, Trash2, Edit3, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { loadCards } from '../hooks/useCardStorage';
-import { getFrame } from '../data/frames';
+import VmaxCard from '../components/Card';
 import type { CardData } from '../types/card';
 
 // v1.3 — ctxAWR: Deck stored in localStorage as JSON (IndexedDB reserved for cards)
@@ -130,19 +130,15 @@ export default function Decks() {
                 <div className="p-8 space-y-6">
                   {deckCards.length > 0 ? (
                     <div className="flex -space-x-3">
-                      {deckCards.slice(0, 4).map((card) => {
-                        const frame = getFrame(card.frameId);
-                        return (
-                          <div key={card.id} className="w-12 h-16 rounded-lg overflow-hidden border-2 border-surface-container-lowest shadow-md relative">
-                            {card.imageDataUrl ? (
-                              <img src={card.imageDataUrl} alt={card.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full bg-surface-container-high" />
-                            )}
-                            <img src={frame?.src ?? '/frames/frame_classic_01.png'} alt="" className="absolute inset-0 w-full h-full object-cover z-10" />
-                          </div>
-                        );
-                      })}
+                      {deckCards.slice(0, 4).map((card) => (
+                        <div key={card.id} className="w-12 h-16 rounded-lg overflow-hidden border-2 border-surface-container-lowest shadow-md relative">
+                          {card.imageDataUrl ? (
+                            <img src={card.imageDataUrl} alt={card.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-surface-container-high" />
+                          )}
+                        </div>
+                      ))}
                       {deckCards.length > 4 && (
                         <div className="w-12 h-16 rounded-lg bg-surface-container-high border-2 border-surface-container-lowest shadow-md flex items-center justify-center text-on-surface-variant font-bold text-xs">
                           +{deckCards.length - 4}
@@ -213,36 +209,24 @@ export default function Decks() {
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
               {allCards.map((card) => {
                 const inDeck = activeDeck?.cardIds.includes(card.id) ?? false;
-                const frame = getFrame(card.frameId);
                 return (
                   <button
                     key={card.id}
                     onClick={() => toggleCardInDeck(card.id)}
-                    className={`relative rounded-2xl overflow-hidden shadow-md transition-all text-left ${
+                    className={`relative rounded-2xl overflow-hidden transition-all text-left ${
                       inDeck ? 'ring-3 ring-primary shadow-primary/20 scale-[1.02]' : 'hover:shadow-lg'
                     }`}
                   >
-                    <div className="relative" style={{ aspectRatio: '500/670' }}>
-                      {card.imageDataUrl ? (
-                        <img src={card.imageDataUrl} alt={card.name} className="absolute inset-0 w-full h-full object-cover" />
-                      ) : (
-                        <div className="absolute inset-0 bg-surface-container-high" />
-                      )}
-                      <img src={frame?.src ?? '/frames/frame_classic_01.png'} alt="" className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none" />
-                      {inDeck && (
-                        <div className="absolute inset-0 z-20 bg-primary/20 flex items-center justify-center">
-                          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-                            </svg>
-                          </div>
+                    <VmaxCard card={card} compact />
+                    {inDeck && (
+                      <div className="absolute inset-0 z-30 bg-primary/20 rounded-2xl flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                          </svg>
                         </div>
-                      )}
-                    </div>
-                    <div className="p-3 bg-surface-container-lowest">
-                      <h3 className="text-sm font-extrabold tracking-tight text-on-surface truncate">{card.name}</h3>
-                      <span className="text-[9px] font-bold text-on-surface-variant uppercase">{card.type}</span>
-                    </div>
+                      </div>
+                    )}
                   </button>
                 );
               })}
