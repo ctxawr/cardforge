@@ -1,24 +1,25 @@
-/* Navbar.tsx — Luminous Forge v1.1 */
-/* ctxAWR: Replaced azure-pulse/blue references with luminous-forge/purple tokens */
+/* Navbar.tsx — Luminous Forge v1.3 */
+/* ctxAWR: Auth-aware navbar with Google user avatar/sign-in, removed dummy bell/search */
 import {
   Home as HomeIcon,
   Sparkles,
   LayoutGrid,
   Layers,
   Printer,
-  Search,
-  Bell,
-  UserCircle,
+  LogIn,
+  LogOut,
   Menu,
   X
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Navbar() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, signIn, signOut } = useAuth();
 
   const navItems = [
     { name: 'Home', path: '/', icon: HomeIcon },
@@ -61,23 +62,32 @@ export default function Navbar() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="hidden lg:flex bg-surface-container rounded-full px-4 py-2 items-center gap-2">
-            <Search className="text-outline w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search the vault..."
-              className="bg-transparent border-none focus:ring-0 text-sm w-48 font-medium placeholder:text-outline"
-            />
-          </div>
-
-          <button className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-primary/8">
-            <Bell className="w-5 h-5" />
-          </button>
-
-          <button className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-primary/8">
-            <UserCircle className="w-6 h-6" />
-          </button>
+        <div className="flex items-center gap-3">
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2">
+                {user.picture && (
+                  <img src={user.picture} alt="" className="w-8 h-8 rounded-full border-2 border-primary/20" referrerPolicy="no-referrer" />
+                )}
+                <span className="text-sm font-bold text-on-surface">{user.name.split(' ')[0]}</span>
+              </div>
+              <button
+                onClick={signOut}
+                className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-primary/8"
+                title="Sign out"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={signIn}
+              className="flex items-center gap-2 luminous-forge text-white px-5 py-2 rounded-full font-bold text-sm shadow-md shadow-primary/20 hover:scale-105 transition-transform"
+            >
+              <LogIn className="w-4 h-4" />
+              Sign In
+            </button>
+          )}
 
           <button
             className="md:hidden text-on-surface-variant p-2"

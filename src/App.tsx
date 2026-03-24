@@ -8,26 +8,29 @@ import Gallery from './pages/Gallery';
 import Print from './pages/Print';
 import Decks from './pages/Decks';
 import { motion, AnimatePresence } from 'motion/react';
+import { AuthProvider } from './hooks/useAuth';
 
 export default function App() {
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1 max-w-screen-2xl mx-auto px-6 w-full">
-          <AnimatePresence mode="wait">
-            <Routes>
-              <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
-              <Route path="/studio" element={<PageWrapper><Studio /></PageWrapper>} />
-              <Route path="/gallery" element={<PageWrapper><Gallery /></PageWrapper>} />
-              <Route path="/print" element={<PageWrapper><Print /></PageWrapper>} />
-              <Route path="/decks" element={<PageWrapper><Decks /></PageWrapper>} />
-            </Routes>
-          </AnimatePresence>
-        </main>
-        <Footer />
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen flex flex-col">
+          <Navbar />
+          <main className="flex-1 max-w-screen-2xl mx-auto px-6 w-full">
+            <AnimatePresence mode="wait">
+              <Routes>
+                <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
+                <Route path="/studio" element={<PageWrapper><Studio /></PageWrapper>} />
+                <Route path="/gallery" element={<PageWrapper><Gallery /></PageWrapper>} />
+                <Route path="/print" element={<PageWrapper><Print /></PageWrapper>} />
+                <Route path="/decks" element={<PageWrapper><Decks /></PageWrapper>} />
+              </Routes>
+            </AnimatePresence>
+          </main>
+          <Footer />
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

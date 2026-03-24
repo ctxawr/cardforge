@@ -15,7 +15,7 @@ export default function Footer() {
       </div>
 
       <div className="text-xs text-outline-variant font-medium italic">
-        © 2025 CardForge — Luminous Forge Digital Artifacts. All Rights Reserved.
+        © 2026 CardForge. All Rights Reserved.
       </div>
     </footer>
   );
