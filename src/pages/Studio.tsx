@@ -1,23 +1,24 @@
-/* Studio.tsx — Luminous Forge v1.5 — AI-powered card creator */
-/* ctxAWR: Proper flow: Upload+Crop (reference only) → Analyze+Generate art → Preview+Save
-   The photo is NEVER used on the card — AI generates a stylized character illustration. */
+/* Studio.tsx — Luminous Forge v1.6 — AI-powered card creator */
+/* ctxAWR: Iterative flow: Upload+Crop → Analyze+Edit prompt+Generate art (loop) → Preview+Save
+   Photo is reference only — AI generates stylized character art preserving subject likeness.
+   User can view/edit the full generation prompt and re-generate with feedback. */
 import {
   CloudUpload, ArrowLeft, Download, Sparkles, Wand2, Loader2,
-  Image as ImageIcon, Eye, Zap
+  Image as ImageIcon, Eye, Zap, RefreshCw, ChevronDown, ChevronUp, Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as React from 'react';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import ImageCropper from '../components/ImageCropper';
 import VmaxCard from '../components/Card';
-import { saveCard } from '../hooks/useCardStorage';
+import { saveCard, loadCard } from '../hooks/useCardStorage';
 import { exportCardToPng } from '../hooks/useCardExport';
 import {
   analyzeReferenceImage,
   generateCardArt,
-  generateCardStats,
+  buildArtPrompt,
   isGeminiAvailable,
   type GeneratedStats,
 } from '../hooks/useGeminiAI';
@@ -30,6 +31,8 @@ type WizardStep = 'upload' | 'transform' | 'preview';
 
 export default function Studio() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
   const [step, setStep] = useState<WizardStep>('upload');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +51,9 @@ export default function Studio() {
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState('');
   const [creatureOverride, setCreatureOverride] = useState('');
+  const [artPrompt, setArtPrompt] = useState('');
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [genCount, setGenCount] = useState(0);
 
   // Card stats (auto-filled by AI analysis, editable by user)
   const [cardData, setCardData] = useState({
@@ -60,6 +66,27 @@ export default function Studio() {
     attack2: { name: '', damage: 60, description: '' },
   });
   const [analysisResult, setAnalysisResult] = useState<GeneratedStats | null>(null);
+
+  // Load existing card for editing
+  useEffect(() => {
+    if (!editId) return;
+    loadCard(editId).then(card => {
+      if (!card) return;
+      setCardData({
+        name: card.name,
+        hp: card.hp,
+        type: card.type,
+        rarity: card.rarity,
+        description: card.description,
+        attack1: card.attack1,
+        attack2: card.attack2 ?? { name: '', damage: 60, description: '' },
+      });
+      if (card.imageDataUrl) {
+        setGeneratedArt(card.imageDataUrl);
+        setStep('transform');
+      }
+    });
+  }, [editId]);
 
   const stepIndex = step === 'upload' ? 1 : step === 'transform' ? 2 : 3;
   const referenceImage = croppedImage || rawImage;
@@ -102,7 +129,7 @@ export default function Studio() {
     if (!croppedImage) setRawImage('');
   };
 
-  // Step 1→2: Analyze the reference photo, auto-fill stats
+  // Step 1→2: Analyze the reference photo, auto-fill stats, build initial prompt
   const handleAnalyze = async () => {
     if (!referenceImage || analyzing) return;
     setAnalyzing(true);
@@ -120,6 +147,7 @@ export default function Studio() {
         attack2: stats.attack2,
       });
       setCreatureOverride(stats.suggestedCreature);
+      setArtPrompt(buildArtPrompt(stats, stats.suggestedCreature));
       setStep('transform');
     } catch (err) {
       console.error('Analysis failed:', err);
@@ -129,19 +157,29 @@ export default function Studio() {
     }
   };
 
-  // Generate stylized character art from reference
+  // Rebuild prompt when creature override changes (user hasn't manually edited prompt)
+  const rebuildPrompt = () => {
+    const stats = analysisResult ?? {
+      ...cardData,
+      subjectDescription: '',
+      suggestedCreature: creatureOverride || 'mystical creature',
+    };
+    setArtPrompt(buildArtPrompt(stats, creatureOverride || undefined));
+  };
+
+  // Generate stylized character art from reference using the editable prompt
   const handleGenerateArt = async () => {
     if (!referenceImage || generating) return;
     setGenerating(true);
     setAiError('');
     try {
-      const stats = analysisResult ?? {
-        ...cardData,
-        subjectDescription: '',
-        suggestedCreature: creatureOverride || 'mystical creature',
-      };
-      const artDataUrl = await generateCardArt(referenceImage, stats, creatureOverride || undefined);
+      const prompt = artPrompt || buildArtPrompt(
+        analysisResult ?? { ...cardData, subjectDescription: '', suggestedCreature: creatureOverride || 'mystical creature' },
+        creatureOverride || undefined,
+      );
+      const artDataUrl = await generateCardArt(referenceImage, prompt);
       setGeneratedArt(artDataUrl);
+      setGenCount(c => c + 1);
     } catch (err) {
       console.error('Art generation failed:', err);
       setAiError(err instanceof Error ? err.message : 'Art generation failed. Try again or use a different photo.');
@@ -165,7 +203,7 @@ export default function Studio() {
     setSaving(true);
     try {
       const card: CardData = {
-        id: nanoid(10),
+        id: editId || nanoid(10),
         name: cardData.name || 'Unnamed Card',
         hp: cardData.hp,
         type: cardData.type,
@@ -327,27 +365,29 @@ export default function Studio() {
                   </div>
                 )}
 
-                {/* Art generation */}
+                {/* Art generation — iterative with editable prompt */}
                 {isGeminiAvailable() && (
                   <div className="bg-primary-container/30 rounded-3xl p-6 border border-primary/10 space-y-4">
                     <h3 className="text-sm font-black text-primary uppercase tracking-widest flex items-center gap-2">
                       <Wand2 className="w-4 h-4" /> Generate Character Art
                     </h3>
                     <p className="text-sm text-on-surface-variant">
-                      AI will create a stylized character illustration based on your reference photo.
-                      {!generatedArt && ' Change the creature type below if you want!'}
+                      AI will create a stylized illustration preserving the subject's likeness.
+                      {!generatedArt && ' Change the creature type or edit the full prompt below!'}
                     </p>
+
+                    {/* Creature type quick-edit */}
                     <div className="flex gap-3">
                       <input
                         type="text"
                         value={creatureOverride}
-                        onChange={e => setCreatureOverride(e.target.value)}
+                        onChange={e => { setCreatureOverride(e.target.value); }}
                         placeholder="e.g. 'fire dragon', 'ice wolf', 'thunder hawk'"
                         className="flex-1 bg-surface-container-lowest border-2 border-transparent focus:border-primary/30 rounded-2xl py-3 px-4 font-medium text-on-surface outline-none transition-all text-sm"
-                        onKeyDown={e => e.key === 'Enter' && handleGenerateArt()}
+                        onKeyDown={e => { if (e.key === 'Enter') { rebuildPrompt(); handleGenerateArt(); } }}
                       />
                       <button
-                        onClick={handleGenerateArt}
+                        onClick={() => { rebuildPrompt(); handleGenerateArt(); }}
                         disabled={generating}
                         className="luminous-forge text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-primary/25 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
                       >
@@ -355,9 +395,52 @@ export default function Studio() {
                         {generating ? 'Creating...' : generatedArt ? 'Regenerate' : 'Generate Art'}
                       </button>
                     </div>
+
+                    {/* Expandable full prompt editor */}
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setShowPrompt(!showPrompt)}
+                        className="flex items-center gap-2 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        {showPrompt ? 'Hide' : 'View & Edit'} Full Prompt
+                        {showPrompt ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+                      {showPrompt && (
+                        <div className="space-y-2">
+                          <textarea
+                            value={artPrompt}
+                            onChange={e => setArtPrompt(e.target.value)}
+                            className="w-full bg-surface-container-lowest border-2 border-primary/10 focus:border-primary/30 rounded-2xl py-3 px-4 font-mono text-xs text-on-surface outline-none transition-all resize-y h-48"
+                            placeholder="AI prompt for image generation..."
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={rebuildPrompt}
+                              className="text-xs font-bold text-on-surface-variant hover:text-primary flex items-center gap-1 transition-colors"
+                            >
+                              <RefreshCw className="w-3 h-3" /> Reset to Default
+                            </button>
+                            <button
+                              onClick={handleGenerateArt}
+                              disabled={generating}
+                              className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors disabled:opacity-50"
+                            >
+                              <Sparkles className="w-3 h-3" /> Generate with Edited Prompt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {generatedArt && (
-                      <div className="flex items-center gap-2 text-sm text-primary font-bold">
-                        <Zap className="w-4 h-4" /> Character art generated! See preview on the right.
+                      <div className="bg-surface-container-lowest rounded-2xl p-4 space-y-2 border border-primary/10">
+                        <div className="flex items-center gap-2 text-sm text-primary font-bold">
+                          <Zap className="w-4 h-4" /> Art generated! (attempt #{genCount})
+                        </div>
+                        <p className="text-xs text-on-surface-variant">
+                          Not happy? Edit the prompt above or change the creature type, then hit Regenerate.
+                        </p>
                       </div>
                     )}
                     {aiError && (
@@ -503,7 +586,7 @@ export default function Studio() {
             >
               {step === 'upload' && (analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</> : 'Next: Transform')}
               {step === 'transform' && 'Next: Preview'}
-              {step === 'preview' && (saving ? 'Saving...' : 'Save to Collection')}
+              {step === 'preview' && (saving ? 'Saving...' : editId ? 'Update Card' : 'Save to Collection')}
             </button>
           </div>
         </section>

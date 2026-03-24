@@ -1,4 +1,4 @@
-/* useGeminiAI.ts — Luminous Forge v1.5 */
+/* useGeminiAI.ts — Luminous Forge v1.6 */
 /* ctxAWR: Two-step AI pipeline:
    1. Analyze reference photo → auto-prefill card stats (name, type, powers, attacks)
    2. Generate stylized character art from reference via Gemini 2.5 Flash Image (Nano Banana)
@@ -103,27 +103,27 @@ Respond with ONLY valid JSON (no markdown fences):
   return sanitizeStats(JSON.parse(cleaned));
 }
 
-/* Step 2: Generate stylized character art from reference photo
-   Uses Gemini 2.5 Flash Image (Nano Banana) for image-to-image generation
-   Falls back to gemini-2.0-flash-preview-image-generation if needed */
-export async function generateCardArt(
-  referenceImageDataUrl: string,
+/* Step 2a: Build the image generation prompt (exposed so UI can show/edit it)
+   v1.6 — ctxAWR: Prompt emphasizes preserving the subject's likeness/identity */
+export function buildArtPrompt(
   stats: GeneratedStats,
-  userCreatureOverride?: string,
-): Promise<string> {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error('Gemini API key not configured');
+  creatureOverride?: string,
+): string {
+  const creature = creatureOverride?.trim() || stats.suggestedCreature;
+  return `Transform this reference photo into a stylized anime/cartoon trading card illustration for a kids' card game.
 
-  const ai = new GoogleGenAI({ apiKey });
-  const { mimeType, data } = parseBase64(referenceImageDataUrl);
+CRITICAL — LIKENESS PRESERVATION:
+- The generated character MUST be clearly recognizable as the person/subject in the reference photo
+- Preserve their face shape, hair color/style, skin tone, and distinguishing features
+- Think of it as drawing a cartoon/anime portrait of THIS specific person, not a generic character
+- If the subject is a person, their face should be the focal point and clearly identifiable
 
-  const creature = userCreatureOverride?.trim() || stats.suggestedCreature;
+CHARACTER FUSION:
+- Merge the subject with a ${creature} — add creature-themed armor, accessories, aura, or partial transformation
+- The person's identity comes first, creature elements are layered on top (outfit, wings, tail, energy, etc.)
+- Do NOT replace the person's face or body — enhance them with ${creature} features
 
-  const prompt = `Transform this reference photo into a stylized anime/cartoon trading card illustration for a kids' card game.
-
-IMPORTANT RULES:
-- Do NOT use the photo directly — create a NEW illustrated character INSPIRED by the subject
-- Merge the subject with a ${creature} — they should look like a fun hybrid character
+STYLE & COMPOSITION:
 - Style: vibrant anime/cartoon, colorful, dynamic pose, energy effects
 - Background: dramatic with magical/elemental energy matching "${stats.type}" type
 - Full body character, centered, facing forward or in action pose
@@ -133,6 +133,19 @@ IMPORTANT RULES:
 
 Character name: ${stats.name}
 Element type: ${stats.type}`;
+}
+
+/* Step 2b: Generate stylized character art from reference photo
+   Uses Gemini 2.5 Flash Image (Nano Banana) for image-to-image generation */
+export async function generateCardArt(
+  referenceImageDataUrl: string,
+  prompt: string,
+): Promise<string> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('Gemini API key not configured');
+
+  const ai = new GoogleGenAI({ apiKey });
+  const { mimeType, data } = parseBase64(referenceImageDataUrl);
 
   /* v1.5 — ctxAWR: Correct model IDs for Gemini image generation (Nano Banana family).
      Previous IDs (*-preview-image-generation) returned 404. */

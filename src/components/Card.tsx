@@ -1,5 +1,6 @@
-/* Card.tsx — Luminous Forge v1.4 — VMAX full-bleed card */
-/* ctxAWR: Full-bleed art fills entire card, holographic CSS border, text overlays on art. Replaces frame-window approach. */
+/* Card.tsx — Luminous Forge v1.6 — VMAX full-bleed card with integrated graphics */
+/* ctxAWR: Graphically integrated text — type-colored bars, styled attack panels, damage badges.
+   Not just white text overlay — proper card-game typography with energy-themed accents. */
 import { motion } from 'motion/react';
 import type { CardData } from '../types/card';
 
@@ -10,13 +11,13 @@ interface VmaxCardProps {
   className?: string;
 }
 
-const TYPE_COLORS: Record<CardData['type'], string> = {
-  Fire: 'from-red-600/80 to-orange-500/60',
-  Water: 'from-blue-600/80 to-cyan-400/60',
-  Grass: 'from-green-600/80 to-emerald-400/60',
-  Electric: 'from-yellow-500/80 to-amber-400/60',
-  Psychic: 'from-purple-600/80 to-fuchsia-400/60',
-  Normal: 'from-gray-600/80 to-slate-400/60',
+const TYPE_COLORS: Record<CardData['type'], { gradient: string; bg: string; accent: string; glow: string }> = {
+  Fire:     { gradient: 'from-red-600 to-orange-500',     bg: 'bg-red-600/90',     accent: '#ef4444', glow: 'shadow-red-500/40' },
+  Water:    { gradient: 'from-blue-600 to-cyan-400',      bg: 'bg-blue-600/90',    accent: '#3b82f6', glow: 'shadow-blue-500/40' },
+  Grass:    { gradient: 'from-green-600 to-emerald-400',  bg: 'bg-green-600/90',   accent: '#22c55e', glow: 'shadow-green-500/40' },
+  Electric: { gradient: 'from-yellow-500 to-amber-400',   bg: 'bg-yellow-500/90',  accent: '#eab308', glow: 'shadow-yellow-500/40' },
+  Psychic:  { gradient: 'from-purple-600 to-fuchsia-400', bg: 'bg-purple-600/90',  accent: '#a855f7', glow: 'shadow-purple-500/40' },
+  Normal:   { gradient: 'from-gray-600 to-slate-400',     bg: 'bg-gray-600/90',    accent: '#6b7280', glow: 'shadow-gray-500/40' },
 };
 
 const RARITY_BORDERS: Record<CardData['rarity'], string> = {
@@ -29,7 +30,7 @@ const RARITY_BORDERS: Record<CardData['rarity'], string> = {
 export default function VmaxCard({ card, compact = false, showOverlays = true, className = '' }: VmaxCardProps) {
   const isUltraRare = card.rarity === 'ultra-rare';
   const borderGradient = isUltraRare ? '' : RARITY_BORDERS[card.rarity];
-  const typeGradient = TYPE_COLORS[card.type] || TYPE_COLORS.Normal;
+  const typeTheme = TYPE_COLORS[card.type] || TYPE_COLORS.Normal;
 
   return (
     <motion.div
@@ -54,54 +55,70 @@ export default function VmaxCard({ card, compact = false, showOverlays = true, c
 
         {showOverlays && (
           <>
-            {/* Top bar: name + HP */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-3 flex justify-between items-start">
-              <div className="bg-black/50 backdrop-blur-md rounded-full px-3 py-1 max-w-[70%]">
-                <p className={`text-white font-black ${compact ? 'text-xs' : 'text-sm'} tracking-tight truncate`}>
+            {/* Top name bar — type-colored gradient strip */}
+            <div className="absolute top-0 left-0 right-0 z-20">
+              <div className={`bg-gradient-to-r ${typeTheme.gradient} px-3 py-2 flex justify-between items-center`}>
+                <p className={`text-white font-black ${compact ? 'text-[10px]' : 'text-sm'} tracking-tight truncate drop-shadow-md max-w-[65%]`}>
                   {card.name || 'Card Name'}
                 </p>
+                <div className="flex items-center gap-1">
+                  <span className={`text-white font-black ${compact ? 'text-[10px]' : 'text-lg'} drop-shadow-md`}>{card.hp}</span>
+                  <span className="text-white/80 text-[8px] font-bold">HP</span>
+                </div>
               </div>
-              <div className="bg-black/50 backdrop-blur-md rounded-full px-2.5 py-1 flex items-center gap-1">
-                <span className={`text-white font-black ${compact ? 'text-xs' : 'text-sm'}`}>{card.hp}</span>
-                <span className="text-white/70 text-[9px] font-bold">HP</span>
+              {/* Sub-bar: type + rarity badges */}
+              <div className="flex justify-between px-2 -mt-0.5">
+                <span className={`${typeTheme.bg} text-white text-[7px] font-black px-2 py-0.5 rounded-b-md uppercase tracking-widest shadow-md ${typeTheme.glow}`}>
+                  {card.type}
+                </span>
+                <span className={`${isUltraRare ? 'vmax-holo' : 'bg-black/70'} text-white text-[7px] font-black px-2 py-0.5 rounded-b-md uppercase tracking-widest`}>
+                  {card.rarity === 'ultra-rare' ? 'VMAX' : card.rarity}
+                </span>
               </div>
             </div>
 
-            {/* Rarity badge */}
-            <div className={`absolute top-12 right-3 z-20 ${isUltraRare ? 'vmax-holo text-white' : 'bg-black/50 backdrop-blur-md text-white'} text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest`}>
-              {card.rarity === 'ultra-rare' ? 'VMAX' : card.rarity}
-            </div>
-
-            {/* Type badge */}
-            <div className={`absolute top-12 left-3 z-20 bg-gradient-to-r ${typeGradient} backdrop-blur-md text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest`}>
-              {card.type}
-            </div>
-
-            {/* Bottom overlay: attacks + description */}
+            {/* Bottom panel: attacks + description — styled card-game info area */}
             {!compact && (
-              <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-16 pb-3 px-3 space-y-1.5">
-                {card.attack1?.name && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-white text-xs font-bold">{card.attack1.name}</span>
-                    <span className="text-white/90 text-xs font-black">{card.attack1.damage}</span>
-                  </div>
-                )}
-                {card.attack2?.name && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-white text-xs font-bold">{card.attack2.name}</span>
-                    <span className="text-white/90 text-xs font-black">{card.attack2.damage}</span>
-                  </div>
-                )}
-                {card.description && (
-                  <p className="text-white/60 text-[9px] italic line-clamp-2 pt-1">{card.description}</p>
-                )}
+              <div className="absolute bottom-0 left-0 right-0 z-20">
+                {/* Gradient fade into info panel */}
+                <div className="h-8 bg-gradient-to-t from-black/95 to-transparent" />
+                <div className="bg-black/90 backdrop-blur-sm px-3 pb-3 space-y-1.5">
+                  {/* Attack 1 */}
+                  {card.attack1?.name && (
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1 h-5 rounded-full bg-gradient-to-b ${typeTheme.gradient} shrink-0`} />
+                      <span className="text-white text-[11px] font-bold flex-1 truncate">{card.attack1.name}</span>
+                      <span className={`bg-gradient-to-r ${typeTheme.gradient} text-white text-[10px] font-black px-2 py-0.5 rounded-md min-w-[36px] text-center shadow-sm ${typeTheme.glow}`}>
+                        {card.attack1.damage}
+                      </span>
+                    </div>
+                  )}
+                  {/* Attack 2 */}
+                  {card.attack2?.name && (
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1 h-5 rounded-full bg-gradient-to-b ${typeTheme.gradient} shrink-0`} />
+                      <span className="text-white text-[11px] font-bold flex-1 truncate">{card.attack2.name}</span>
+                      <span className={`bg-gradient-to-r ${typeTheme.gradient} text-white text-[10px] font-black px-2 py-0.5 rounded-md min-w-[36px] text-center shadow-sm ${typeTheme.glow}`}>
+                        {card.attack2.damage}
+                      </span>
+                    </div>
+                  )}
+                  {/* Description / flavor text */}
+                  {card.description && (
+                    <div className="border-t border-white/10 pt-1.5 mt-1">
+                      <p className="text-white/50 text-[8px] italic line-clamp-2 leading-relaxed">{card.description}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {/* Compact: just name strip at bottom */}
             {compact && (
-              <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/80 to-transparent p-2">
-                <p className="text-white text-[10px] font-bold truncate">{card.name}</p>
+              <div className="absolute bottom-0 left-0 right-0 z-20">
+                <div className={`bg-gradient-to-r ${typeTheme.gradient} px-2 py-1.5`}>
+                  <p className="text-white text-[9px] font-bold truncate drop-shadow-sm">{card.name}</p>
+                </div>
               </div>
             )}
           </>
@@ -116,5 +133,4 @@ export default function VmaxCard({ card, compact = false, showOverlays = true, c
   );
 }
 
-/* Export for backward compat — pages that import CardProps */
 export type { VmaxCardProps as CardProps };

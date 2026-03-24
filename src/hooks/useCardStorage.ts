@@ -1,6 +1,5 @@
-// v1.0 — ctxAWR: IndexedDB persistence for saved cards via idb
-// Purpose: Save/load/delete CardData objects across sessions
-// Context: Cards have large base64 image fields; IndexedDB handles binary data natively
+// v1.1 — ctxAWR: IndexedDB persistence for saved cards via idb
+// Added: loadCard (single), updateCard for gallery editing
 import { openDB } from 'idb';
 import type { CardData } from '../types/card';
 
@@ -21,6 +20,11 @@ async function getDB() {
 export async function saveCard(card: CardData): Promise<void> {
   const db = await getDB();
   await db.put(STORE, card);
+}
+
+export async function loadCard(id: string): Promise<CardData | undefined> {
+  const db = await getDB();
+  return db.get(STORE, id);
 }
 
 export async function loadCards(): Promise<CardData[]> {

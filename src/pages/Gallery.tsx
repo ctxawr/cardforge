@@ -1,14 +1,15 @@
-/* Gallery.tsx — Luminous Forge v1.4 — VMAX full-bleed cards */
-/* ctxAWR: Updated to use VmaxCard component for full-bleed rendering */
+/* Gallery.tsx — Luminous Forge v1.6 — editable VMAX cards */
+/* ctxAWR: Added Edit button — navigates to Studio with ?edit=<id> to re-edit saved cards */
 import { useState, useEffect } from 'react';
-import { PlusCircle, Trash2, Download } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { PlusCircle, Trash2, Download, Pencil } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { loadCards, deleteCard } from '../hooks/useCardStorage';
 import { exportCardToPng } from '../hooks/useCardExport';
 import VmaxCard from '../components/Card';
 import type { CardData } from '../types/card';
 
 export default function Gallery() {
+  const navigate = useNavigate();
   const [cards, setCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,6 +67,12 @@ export default function Gallery() {
                 <VmaxCard card={card} />
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={() => navigate(`/studio?edit=${card.id}`)}
+                  className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-on-surface-variant hover:text-primary py-2 rounded-xl bg-surface-container-low hover:bg-primary/10 transition-all"
+                >
+                  <Pencil className="w-3 h-3" /> Edit
+                </button>
                 <button
                   onClick={() => handleExport(card)}
                   className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-on-surface-variant hover:text-primary py-2 rounded-xl bg-surface-container-low hover:bg-primary/10 transition-all"
