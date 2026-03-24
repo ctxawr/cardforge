@@ -1,6 +1,7 @@
-/* Card.tsx — Luminous Forge v1.7 — VMAX card with integrated TCG-style graphics */
-/* ctxAWR: Modeled after real VMAX Electric cards — energy orbs, large damage circles,
-   attack descriptions, divider lines, weakness/resistance bar. Full graphical integration. */
+/* Card.tsx — Luminous Forge v1.8 — VMAX full-bleed, art visible everywhere */
+/* ctxAWR: Modeled after real VMAX cards (see Voltamother sample). Art fills entire card.
+   Attacks are thin translucent strips overlaid on art — NO heavy black panel.
+   Name/HP top bar is minimal. Bottom info is compact translucent rows. */
 import { motion } from 'motion/react';
 import type { CardData } from '../types/card';
 
@@ -32,7 +33,6 @@ const RARITY_BORDERS: Record<CardData['rarity'], string> = {
   'ultra-rare': '',
 };
 
-/* Energy orb — small type-colored circle like TCG energy symbols */
 function EnergyOrb({ type, size = 'sm' }: { type: CardData['type']; size?: 'sm' | 'md' }) {
   const theme = TYPE_COLORS[type] || TYPE_COLORS.Normal;
   const dim = size === 'md' ? 'w-4 h-4 text-[8px]' : 'w-3 h-3 text-[6px]';
@@ -40,16 +40,6 @@ function EnergyOrb({ type, size = 'sm' }: { type: CardData['type']; size?: 'sm' 
     <span className={`${dim} ${theme.energy} rounded-full inline-flex items-center justify-center text-white font-black shrink-0 shadow-sm`}>
       {TYPE_EMOJI[type]}
     </span>
-  );
-}
-
-/* Damage circle — large type-colored circle with damage number */
-function DamageCircle({ damage, type }: { damage: number; type: CardData['type'] }) {
-  const theme = TYPE_COLORS[type] || TYPE_COLORS.Normal;
-  return (
-    <div className={`w-8 h-8 ${theme.energy} rounded-full flex items-center justify-center shrink-0 shadow-md ${theme.glow}`}>
-      <span className="text-white font-black text-[11px] drop-shadow-sm">{damage}</span>
-    </div>
   );
 }
 
@@ -63,12 +53,12 @@ export default function VmaxCard({ card, compact = false, showOverlays = true, c
       whileHover={compact ? undefined : { y: -8 }}
       className={`group relative ${className}`}
     >
-      {/* Holographic border — animated for ultra-rare, static gradient for others */}
+      {/* Holographic border */}
       <div className={`absolute -inset-[3px] rounded-[1.25rem] ${isUltraRare ? 'vmax-holo' : `bg-gradient-to-br ${borderGradient}`} opacity-80 group-hover:opacity-100 transition-opacity`} />
 
       {/* Card body */}
       <div className="relative rounded-2xl overflow-hidden bg-black" style={{ aspectRatio: '500/700' }}>
-        {/* Full-bleed art */}
+        {/* Full-bleed art — fills entire card */}
         {card.imageDataUrl ? (
           <img
             src={card.imageDataUrl}
@@ -81,130 +71,119 @@ export default function VmaxCard({ card, compact = false, showOverlays = true, c
 
         {showOverlays && (
           <>
-            {/* ── TOP BAR: Name + HP (VMAX style) ── */}
-            <div className="absolute top-0 left-0 right-0 z-20">
-              <div className="bg-black/70 backdrop-blur-sm px-3 py-1.5 flex justify-between items-center border-b-2" style={{ borderColor: typeTheme.accent }}>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <EnergyOrb type={card.type} size="md" />
-                  <p className={`text-white font-black ${compact ? 'text-[10px]' : 'text-[13px]'} tracking-tight truncate drop-shadow-md`}>
+            {/* ── TOP: Name + VMAX tag + HP ── */}
+            <div className="absolute top-0 left-0 right-0 z-20 px-2.5 pt-2">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className={`text-white font-black ${compact ? 'text-[10px]' : 'text-[13px]'} drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] truncate`}>
                     {card.name || 'Card Name'}
-                  </p>
-                  {isUltraRare && (
-                    <span className="vmax-holo text-[7px] font-black px-1.5 py-0.5 rounded text-white uppercase tracking-wider shrink-0">VMAX</span>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-0.5 shrink-0">
-                  <span className={`font-black ${compact ? 'text-[11px]' : 'text-xl'} drop-shadow-md`} style={{ color: typeTheme.accent }}>{card.hp}</span>
-                  <span className="text-white/60 text-[7px] font-bold">HP</span>
-                </div>
-              </div>
-              {/* Sub-badges */}
-              {!compact && (
-                <div className="flex justify-between px-2 mt-0.5">
-                  <span className={`${typeTheme.bg} text-white text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-sm`}>
-                    {card.type}
                   </span>
-                  {!isUltraRare && (
-                    <span className="bg-black/60 text-white/80 text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest capitalize">
-                      {card.rarity}
+                  {isUltraRare && (
+                    <span className="text-[8px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] tracking-wide shrink-0">
+                      V<span className="text-[6px]">MAX</span>
                     </span>
                   )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-white/60 text-[8px] font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">HP</span>
+                  <span className={`font-black ${compact ? 'text-[12px]' : 'text-lg'} drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]`} style={{ color: typeTheme.accent }}>
+                    {card.hp}
+                  </span>
+                  <EnergyOrb type={card.type} size="md" />
+                </div>
+              </div>
+              {/* Sub-line: evolution text + type badge */}
+              {!compact && (
+                <div className="flex justify-between items-center mt-0.5">
+                  <span className="text-white/50 text-[7px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    Evolves from {card.name} V
+                  </span>
+                  <span className={`${typeTheme.bg} text-white text-[6px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shadow-sm`}>
+                    {card.rarity === 'ultra-rare' ? 'Gigantamax' : card.type}
+                  </span>
                 </div>
               )}
             </div>
 
-            {/* ── BOTTOM PANEL: Attacks, description, weakness bar (VMAX TCG layout) ── */}
+            {/* ── BOTTOM: Attacks as translucent strips over the art ── */}
             {!compact && (
-              <div className="absolute bottom-0 left-0 right-0 z-20">
-                {/* Gradient fade */}
-                <div className="h-12 bg-gradient-to-t from-black/95 via-black/70 to-transparent" />
-
-                {/* Info panel */}
-                <div className="bg-black/90 backdrop-blur-sm">
-                  {/* Attacks */}
-                  <div className="px-3 pt-1 pb-1.5 space-y-1">
-                    {/* Attack 1 */}
-                    {card.attack1?.name && (
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <EnergyOrb type={card.type} />
-                          <EnergyOrb type={card.type} />
-                          <span className="text-white text-[11px] font-extrabold flex-1 truncate tracking-tight">{card.attack1.name}</span>
-                          <DamageCircle damage={card.attack1.damage} type={card.type} />
-                        </div>
-                        {card.attack1.description && (
-                          <p className="text-white/40 text-[7px] leading-tight pl-[26px]">{card.attack1.description}</p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Divider between attacks */}
-                    {card.attack1?.name && card.attack2?.name && (
-                      <div className="flex items-center gap-2 py-0.5">
-                        <div className="flex-1 h-px bg-white/10" />
+              <div className="absolute bottom-0 left-0 right-0 z-20 flex flex-col">
+                {/* Attack rows — translucent strips, art visible behind */}
+                <div className="px-2.5 space-y-1 mb-1">
+                  {/* Attack 1 */}
+                  {card.attack1?.name && (
+                    <div className="bg-black/30 backdrop-blur-[2px] rounded-lg px-2 py-1.5">
+                      <div className="flex items-center gap-1">
                         <EnergyOrb type={card.type} />
-                        <div className="flex-1 h-px bg-white/10" />
+                        <EnergyOrb type={card.type} />
+                        <span className="text-white text-[11px] font-extrabold flex-1 truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ml-1">{card.attack1.name}</span>
+                        <span className="text-white text-[13px] font-black drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ml-2">{card.attack1.damage}+</span>
                       </div>
-                    )}
-
-                    {/* Attack 2 */}
-                    {card.attack2?.name && (
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <EnergyOrb type={card.type} />
-                          <EnergyOrb type={card.type} />
-                          <EnergyOrb type={card.type} />
-                          <span className="text-white text-[11px] font-extrabold flex-1 truncate tracking-tight">{card.attack2.name}</span>
-                          <DamageCircle damage={card.attack2.damage} type={card.type} />
-                        </div>
-                        {card.attack2.description && (
-                          <p className="text-white/40 text-[7px] leading-tight pl-[35px]">{card.attack2.description}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Flavor text */}
-                  {card.description && (
-                    <div className="px-3 pb-1.5">
-                      <p className="text-white/30 text-[7px] italic line-clamp-2 leading-relaxed border-t border-white/5 pt-1">{card.description}</p>
+                      {card.attack1.description && (
+                        <p className="text-white/60 text-[7px] mt-0.5 leading-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] pl-[22px]">{card.attack1.description}</p>
+                      )}
                     </div>
                   )}
 
-                  {/* Weakness / Resistance / Retreat bar — VMAX style footer */}
-                  <div className="flex items-center justify-between px-3 py-1 border-t-2" style={{ borderColor: typeTheme.accent + '40' }}>
-                    <div className="flex items-center gap-3">
+                  {/* Attack 2 */}
+                  {card.attack2?.name && (
+                    <div className="bg-black/30 backdrop-blur-[2px] rounded-lg px-2 py-1.5">
                       <div className="flex items-center gap-1">
-                        <span className="text-white/30 text-[6px] font-bold uppercase">Weakness</span>
-                        <span className="bg-red-600/80 text-white text-[6px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center">2x</span>
+                        <EnergyOrb type={card.type} />
+                        <EnergyOrb type={card.type} />
+                        <EnergyOrb type={card.type} />
+                        <span className="text-white text-[11px] font-extrabold flex-1 truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ml-1">{card.attack2.name}</span>
+                        <span className="text-white text-[13px] font-black drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ml-2">{card.attack2.damage}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-white/30 text-[6px] font-bold uppercase">Resist</span>
-                        <span className="bg-green-600/60 text-white text-[6px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center">-30</span>
-                      </div>
+                      {card.attack2.description && (
+                        <p className="text-white/60 text-[7px] mt-0.5 leading-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] pl-[31px]">{card.attack2.description}</p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-white/30 text-[6px] font-bold uppercase">Retreat</span>
+                  )}
+                </div>
+
+                {/* Weakness / Resistance / Retreat — thin bottom bar */}
+                <div className="bg-black/40 backdrop-blur-[2px] flex items-center justify-between px-2.5 py-1">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-white/40 text-[6px] font-bold">weakness</span>
+                      <EnergyOrb type={card.type === 'Electric' ? 'Grass' : card.type === 'Fire' ? 'Water' : card.type === 'Water' ? 'Electric' : card.type === 'Grass' ? 'Fire' : 'Normal'} />
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-white/40 text-[6px] font-bold">resistance</span>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-white/40 text-[6px] font-bold">retreat</span>
                       <EnergyOrb type="Normal" />
                       <EnergyOrb type="Normal" />
                     </div>
                   </div>
                 </div>
+
+                {/* VMAX rule + rarity footer */}
+                <div className="bg-black/50 flex items-center justify-between px-2.5 py-1 rounded-b-2xl">
+                  <p className="text-white/30 text-[6px] italic line-clamp-1 flex-1">
+                    {card.description || (isUltraRare ? 'VMAX rule: When your Pokemon VMAX is Knocked Out, your opponent takes 3 Prize cards.' : '')}
+                  </p>
+                  <span className="text-[6px] font-black uppercase tracking-widest shrink-0 ml-2 drop-shadow-sm" style={{ color: typeTheme.accent }}>
+                    {card.rarity === 'ultra-rare' ? 'RAINBOW RARE' : card.rarity?.toUpperCase()}
+                  </span>
+                </div>
               </div>
             )}
 
-            {/* Compact: type-colored name strip */}
+            {/* Compact: minimal name at bottom */}
             {compact && (
               <div className="absolute bottom-0 left-0 right-0 z-20">
-                <div className="bg-black/80 backdrop-blur-sm px-2 py-1.5 border-t" style={{ borderColor: typeTheme.accent + '60' }}>
-                  <p className="text-white text-[9px] font-bold truncate drop-shadow-sm">{card.name}</p>
+                <div className="bg-black/30 backdrop-blur-[2px] px-2 py-1.5 rounded-b-2xl">
+                  <p className="text-white text-[9px] font-bold truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{card.name}</p>
                 </div>
               </div>
             )}
           </>
         )}
 
-        {/* Holographic sheen overlay for ultra-rare */}
+        {/* Holographic sheen for ultra-rare */}
         {isUltraRare && (
           <div className="absolute inset-0 z-10 bg-gradient-to-br from-white/10 via-transparent to-white/5 mix-blend-overlay pointer-events-none" />
         )}
