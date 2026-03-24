@@ -1,7 +1,8 @@
-/* Card.tsx — Luminous Forge v1.8 — VMAX full-bleed, art visible everywhere */
+/* Card.tsx — Luminous Forge v1.9 — fix weakness/resistance display */
 /* ctxAWR: Modeled after real VMAX cards (see Voltamother sample). Art fills entire card.
    Attacks are thin translucent strips overlaid on art — NO heavy black panel.
-   Name/HP top bar is minimal. Bottom info is compact translucent rows. */
+   Name/HP top bar is minimal. Bottom info is compact translucent rows.
+   v1.9: Fixed weakness/resistance — now shows correct types with 2x/-30 values. */
 import { motion } from 'motion/react';
 import type { CardData } from '../types/card';
 
@@ -31,6 +32,16 @@ const RARITY_BORDERS: Record<CardData['rarity'], string> = {
   'uncommon': 'from-emerald-400 via-teal-300 to-emerald-400',
   'rare': 'from-amber-400 via-yellow-300 to-amber-400',
   'ultra-rare': '',
+};
+
+const WEAKNESS_MAP: Record<CardData['type'], CardData['type']> = {
+  Fire: 'Water', Water: 'Electric', Grass: 'Fire',
+  Electric: 'Grass', Psychic: 'Psychic', Normal: 'Psychic',
+};
+
+const RESISTANCE_MAP: Record<CardData['type'], CardData['type']> = {
+  Fire: 'Grass', Water: 'Fire', Grass: 'Water',
+  Electric: 'Fire', Psychic: 'Normal', Normal: 'Grass',
 };
 
 function EnergyOrb({ type, size = 'sm' }: { type: CardData['type']; size?: 'sm' | 'md' }) {
@@ -146,14 +157,17 @@ export default function VmaxCard({ card, compact = false, showOverlays = true, c
                 <div className="bg-black/40 backdrop-blur-[2px] flex items-center justify-between px-2.5 py-1">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-0.5">
-                      <span className="text-white/40 text-[6px] font-bold">weakness</span>
-                      <EnergyOrb type={card.type === 'Electric' ? 'Grass' : card.type === 'Fire' ? 'Water' : card.type === 'Water' ? 'Electric' : card.type === 'Grass' ? 'Fire' : 'Normal'} />
+                      <span className="text-white/40 text-[6px] font-bold uppercase">weakness</span>
+                      <EnergyOrb type={WEAKNESS_MAP[card.type]} />
+                      <span className="text-red-400 text-[7px] font-black">2x</span>
                     </div>
                     <div className="flex items-center gap-0.5">
-                      <span className="text-white/40 text-[6px] font-bold">resistance</span>
+                      <span className="text-white/40 text-[6px] font-bold uppercase">resist</span>
+                      <EnergyOrb type={RESISTANCE_MAP[card.type]} />
+                      <span className="text-green-400 text-[7px] font-black">-30</span>
                     </div>
                     <div className="flex items-center gap-0.5">
-                      <span className="text-white/40 text-[6px] font-bold">retreat</span>
+                      <span className="text-white/40 text-[6px] font-bold uppercase">retreat</span>
                       <EnergyOrb type="Normal" />
                       <EnergyOrb type="Normal" />
                     </div>
