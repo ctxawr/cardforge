@@ -1,7 +1,6 @@
-// v1.0 — ctxAWR: Google Sign-In via Google Identity Services (GSI)
-// Purpose: Client-side auth for GitHub Pages SPA — no backend needed
-// Context: Decodes JWT credential from Google to get name, email, picture
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+/* useAuth.tsx — Luminous Forge v1.4 */
+/* ctxAWR: Fixed sign-in — use renderButton (popup OAuth) instead of prompt() (One Tap) which gets silently suppressed */
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import * as React from 'react';
 
 interface User {
@@ -16,6 +15,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: () => void;
   signOut: () => void;
+  renderGoogleButton: (element: HTMLElement | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,13 +23,13 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signIn: () => {},
   signOut: () => {},
+  renderGoogleButton: () => {},
 });
 
 export function useAuth(): AuthContextType {
   return useContext(AuthContext);
 }
 
-// v1.0 — ctxAWR: Decode JWT payload without external library
 function decodeJwtPayload(token: string): Record<string, unknown> {
   const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
   return JSON.parse(atob(base64));
@@ -41,6 +41,7 @@ const CLIENT_ID = (process.env.GOOGLE_CLIENT_ID as string) || '';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const gsiInitialized = useRef(false);
 
   const handleCredentialResponse = useCallback((response: { credential: string }) => {
     const payload = decodeJwtPayload(response.credential);
@@ -55,43 +56,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Restore session from localStorage
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         setUser(JSON.parse(stored));
-      } catch { /* ignore corrupt data */ }
+      } catch { /* ignore */ }
     }
     setLoading(false);
 
     if (!CLIENT_ID) return;
 
-    // Wait for GSI script to load
     const initGsi = () => {
-      const google = (window as unknown as { google?: { accounts: { id: {
-        initialize: (config: Record<string, unknown>) => void;
-        prompt: () => void;
-      } } } }).google;
-      if (!google) return;
+      const google = (window as any).google;
+      if (!google || gsiInitialized.current) return;
 
       google.accounts.id.initialize({
         client_id: CLIENT_ID,
         callback: handleCredentialResponse,
         auto_select: true,
       });
-
-      // Show One Tap if no user stored
-      if (!stored) {
-        google.accounts.id.prompt();
-      }
+      gsiInitialized.current = true;
     };
 
-    // GSI script may not be loaded yet
-    if ((window as unknown as { google?: unknown }).google) {
+    if ((window as any).google) {
       initGsi();
     } else {
       const interval = setInterval(() => {
-        if ((window as unknown as { google?: unknown }).google) {
+        if ((window as any).google) {
           clearInterval(interval);
           initGsi();
         }
@@ -100,11 +91,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [handleCredentialResponse]);
 
+  /* v1.4 — ctxAWR: Render Google's official sign-in button into a DOM element.
+     This uses popup OAuth flow which always works (unlike One Tap prompt which gets suppressed). */
+  const renderGoogleButton = useCallback((element: HTMLElement | null) => {
+    if (!element || !CLIENT_ID) return;
+    const google = (window as any).google;
+    if (!google) return;
+
+    google.accounts.id.renderButton(element, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text: 'signin_with',
+      shape: 'pill',
+      logo_alignment: 'left',
+    });
+  }, []);
+
   const signIn = useCallback(() => {
     if (!CLIENT_ID) return;
-    const google = (window as unknown as { google?: { accounts: { id: {
-      prompt: () => void;
-    } } } }).google;
+    const google = (window as any).google;
     if (google) {
       google.accounts.id.prompt();
     }
@@ -113,16 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(() => {
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
-    const google = (window as unknown as { google?: { accounts: { id: {
-      disableAutoSelect: () => void;
-    } } } }).google;
+    const google = (window as any).google;
     if (google) {
       google.accounts.id.disableAutoSelect();
     }
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signOut, renderGoogleButton }}>
       {children}
     </AuthContext.Provider>
   );

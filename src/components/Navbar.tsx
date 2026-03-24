@@ -1,25 +1,28 @@
-/* Navbar.tsx — Luminous Forge v1.3 */
-/* ctxAWR: Auth-aware navbar with Google user avatar/sign-in, removed dummy bell/search */
+/* Navbar.tsx — Luminous Forge v1.4 */
+/* ctxAWR: Fixed sign-in — uses renderGoogleButton for reliable OAuth popup instead of suppressed One Tap */
 import {
   Home as HomeIcon,
   Sparkles,
   LayoutGrid,
   Layers,
   Printer,
-  LogIn,
   LogOut,
   Menu,
   X
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Navbar() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, signIn, signOut } = useAuth();
+  const { user, signOut, renderGoogleButton } = useAuth();
+
+  const googleBtnRef = useCallback((el: HTMLDivElement | null) => {
+    renderGoogleButton(el);
+  }, [renderGoogleButton]);
 
   const navItems = [
     { name: 'Home', path: '/', icon: HomeIcon },
@@ -80,13 +83,7 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={signIn}
-              className="flex items-center gap-2 luminous-forge text-white px-5 py-2 rounded-full font-bold text-sm shadow-md shadow-primary/20 hover:scale-105 transition-transform"
-            >
-              <LogIn className="w-4 h-4" />
-              Sign In
-            </button>
+            <div ref={googleBtnRef} className="h-10" />
           )}
 
           <button
