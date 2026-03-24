@@ -134,9 +134,11 @@ IMPORTANT RULES:
 Character name: ${stats.name}
 Element type: ${stats.type}`;
 
+  /* v1.5 — ctxAWR: Correct model IDs for Gemini image generation (Nano Banana family).
+     Previous IDs (*-preview-image-generation) returned 404. */
   const models = [
-    'gemini-2.5-flash-preview-image-generation',
-    'gemini-2.0-flash-preview-image-generation',
+    'gemini-2.5-flash-image',
+    'gemini-3.1-flash-image-preview',
   ];
 
   for (const model of models) {
@@ -144,17 +146,9 @@ Element type: ${stats.type}`;
       const response = await ai.models.generateContent({
         model,
         contents: [
-          {
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType, data } },
-              { text: prompt },
-            ],
-          },
+          { text: prompt },
+          { inlineData: { mimeType, data } },
         ],
-        config: {
-          responseModalities: ['IMAGE'],
-        },
       });
 
       if (response.candidates?.[0]?.content?.parts) {

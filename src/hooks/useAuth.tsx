@@ -1,5 +1,6 @@
-/* useAuth.tsx — Luminous Forge v1.4 */
-/* ctxAWR: Fixed sign-in — use renderButton (popup OAuth) instead of prompt() (One Tap) which gets silently suppressed */
+/* useAuth.tsx — Luminous Forge v1.5 */
+/* ctxAWR: Fixed GSI timing — renderButton queued until after initialize() completes.
+   Uses renderButton (popup OAuth) instead of prompt() which gets suppressed. */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import * as React from 'react';
 
@@ -41,7 +42,8 @@ const CLIENT_ID = (process.env.GOOGLE_CLIENT_ID as string) || '';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const gsiInitialized = useRef(false);
+  const gsiReady = useRef(false);
+  const pendingButtonEl = useRef<HTMLElement | null>(null);
 
   const handleCredentialResponse = useCallback((response: { credential: string }) => {
     const payload = decodeJwtPayload(response.credential);
@@ -53,6 +55,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     setUser(userData);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+  }, []);
+
+  const doRenderButton = useCallback((el: HTMLElement) => {
+    const google = (window as any).google;
+    if (!google) return;
+    google.accounts.id.renderButton(el, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text: 'signin_with',
+      shape: 'pill',
+      logo_alignment: 'left',
+    });
   }, []);
 
   useEffect(() => {
@@ -68,14 +83,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initGsi = () => {
       const google = (window as any).google;
-      if (!google || gsiInitialized.current) return;
+      if (!google || gsiReady.current) return;
 
       google.accounts.id.initialize({
         client_id: CLIENT_ID,
         callback: handleCredentialResponse,
         auto_select: true,
       });
-      gsiInitialized.current = true;
+      gsiReady.current = true;
+
+      // Render any button that was queued before GSI was ready
+      if (pendingButtonEl.current) {
+        doRenderButton(pendingButtonEl.current);
+        pendingButtonEl.current = null;
+      }
     };
 
     if ((window as any).google) {
@@ -89,24 +110,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }, 100);
       return () => clearInterval(interval);
     }
-  }, [handleCredentialResponse]);
+  }, [handleCredentialResponse, doRenderButton]);
 
-  /* v1.4 — ctxAWR: Render Google's official sign-in button into a DOM element.
-     This uses popup OAuth flow which always works (unlike One Tap prompt which gets suppressed). */
+  /* v1.5 — ctxAWR: Queue element if GSI not yet initialized, render immediately if ready */
   const renderGoogleButton = useCallback((element: HTMLElement | null) => {
     if (!element || !CLIENT_ID) return;
-    const google = (window as any).google;
-    if (!google) return;
 
-    google.accounts.id.renderButton(element, {
-      type: 'standard',
-      theme: 'outline',
-      size: 'large',
-      text: 'signin_with',
-      shape: 'pill',
-      logo_alignment: 'left',
-    });
-  }, []);
+    if (gsiReady.current) {
+      doRenderButton(element);
+    } else {
+      // GSI not ready yet — queue for rendering after initialize()
+      pendingButtonEl.current = element;
+    }
+  }, [doRenderButton]);
 
   const signIn = useCallback(() => {
     if (!CLIENT_ID) return;
