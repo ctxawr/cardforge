@@ -1,7 +1,7 @@
-/* Gallery.tsx — Luminous Forge v1.6 — editable VMAX cards */
-/* ctxAWR: Added Edit button — navigates to Studio with ?edit=<id> to re-edit saved cards */
+/* Gallery.tsx — Luminous Forge v1.7 — delete confirmation */
+/* ctxAWR: Added inline delete confirmation — prevents accidental card deletion (critical for kids) */
 import { useState, useEffect } from 'react';
-import { PlusCircle, Trash2, Download, Pencil } from 'lucide-react';
+import { PlusCircle, Trash2, Download, Pencil, AlertTriangle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { loadCards, deleteCard } from '../hooks/useCardStorage';
 import { exportCardToPng } from '../hooks/useCardExport';
@@ -12,6 +12,7 @@ export default function Gallery() {
   const navigate = useNavigate();
   const [cards, setCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCards().then(c => {
@@ -23,6 +24,7 @@ export default function Gallery() {
   const handleDelete = async (id: string) => {
     await deleteCard(id);
     setCards(prev => prev.filter(c => c.id !== id));
+    setConfirmDeleteId(null);
   };
 
   const handleExport = (card: CardData) => {
@@ -78,12 +80,29 @@ export default function Gallery() {
                 >
                   <Download className="w-3 h-3" /> Export
                 </button>
-                <button
-                  onClick={() => handleDelete(card.id)}
-                  className="flex items-center justify-center gap-1 text-xs font-bold text-on-surface-variant hover:text-error px-4 py-2 rounded-xl bg-surface-container-low hover:bg-error/10 transition-all"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+                {confirmDeleteId === card.id ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleDelete(card.id)}
+                      className="flex items-center justify-center gap-1 text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-3 py-2 rounded-xl transition-all"
+                    >
+                      <AlertTriangle className="w-3 h-3" /> Delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="text-xs font-bold text-on-surface-variant hover:text-on-surface px-3 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(card.id)}
+                    className="flex items-center justify-center gap-1 text-xs font-bold text-on-surface-variant hover:text-error px-4 py-2 rounded-xl bg-surface-container-low hover:bg-error/10 transition-all"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

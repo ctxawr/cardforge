@@ -49,17 +49,9 @@ function drawEnergyOrb(ctx: CanvasRenderingContext2D, x: number, y: number, r: n
   ctx.stroke();
 }
 
-export async function exportCardToPng(card: CardData): Promise<void> {
-  const canvas = document.createElement('canvas');
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext('2d')!;
-
+/** Render a single card (art + text overlays) onto the given canvas context. */
+async function renderCard(ctx: CanvasRenderingContext2D, card: CardData): Promise<void> {
   const accent = TYPE_HEX[card.type] || TYPE_HEX.Normal;
-
-  // Clip to rounded rect
-  roundRect(ctx, 0, 0, CARD_W, CARD_H, BORDER_R);
-  ctx.clip();
 
   // Draw card art full-bleed
   if (card.imageDataUrl) {
@@ -229,6 +221,19 @@ export async function exportCardToPng(card: CardData): Promise<void> {
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.restore();
+}
+
+export async function exportCardToPng(card: CardData): Promise<void> {
+  const canvas = document.createElement('canvas');
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
+  const ctx = canvas.getContext('2d')!;
+
+  // Clip to rounded rect
+  roundRect(ctx, 0, 0, CARD_W, CARD_H, BORDER_R);
+  ctx.clip();
+
+  await renderCard(ctx, card);
 
   // Download
   const link = document.createElement('a');
@@ -282,34 +287,16 @@ export async function exportPrintSheet(cards: CardData[]): Promise<void> {
     const x = margin + col * (CARD_W + gap);
     const y = margin + row * (CARD_H + gap);
 
-    // Create a temp canvas for this card
+    // Render full card (art + text overlays) to temp canvas
     const cardCanvas = document.createElement('canvas');
     cardCanvas.width = CARD_W;
     cardCanvas.height = CARD_H;
     const cardCtx = cardCanvas.getContext('2d')!;
 
-    // Draw art
-    if (card.imageDataUrl) {
-      try {
-        const img = await loadImage(card.imageDataUrl);
-        const scale = Math.max(CARD_W / img.width, CARD_H / img.height);
-        const sw = img.width * scale;
-        const sh = img.height * scale;
-        cardCtx.drawImage(img, (CARD_W - sw) / 2, (CARD_H - sh) / 2, sw, sh);
-      } catch {
-        cardCtx.fillStyle = '#1a1b23';
-        cardCtx.fillRect(0, 0, CARD_W, CARD_H);
-      }
-    } else {
-      cardCtx.fillStyle = '#1a1b23';
-      cardCtx.fillRect(0, 0, CARD_W, CARD_H);
-    }
-
-    // Draw border
     roundRect(cardCtx, 0, 0, CARD_W, CARD_H, BORDER_R);
-    cardCtx.strokeStyle = (TYPE_HEX[card.type] || '#6b7280') + '80';
-    cardCtx.lineWidth = 4;
-    cardCtx.stroke();
+    cardCtx.clip();
+
+    await renderCard(cardCtx, card);
 
     ctx.drawImage(cardCanvas, x, y);
   }
